@@ -236,8 +236,6 @@ tbody tr {
 }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #F5F7FB; }
-tbody tr.is-live { background: #FFFBF0; }
-tbody tr.is-live:hover { background: #FFF3D0; }
 
 td {
   padding: .38rem .5rem;
