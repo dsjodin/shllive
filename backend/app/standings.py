@@ -123,9 +123,15 @@ def calculate_live_standings(
         if home_code in table:
             table[home_code]["Points"] = table[home_code].get("Points", 0) + home_pts
             table[home_code]["_live_pts"] = home_pts
+            table[home_code]["GF"] = table[home_code].get("GF", 0) + home_score
+            table[home_code]["GA"] = table[home_code].get("GA", 0) + away_score
+            table[home_code]["Diff"] = table[home_code]["GF"] - table[home_code]["GA"]
         if away_code in table:
             table[away_code]["Points"] = table[away_code].get("Points", 0) + away_pts
             table[away_code]["_live_pts"] = away_pts
+            table[away_code]["GF"] = table[away_code].get("GF", 0) + away_score
+            table[away_code]["GA"] = table[away_code].get("GA", 0) + home_score
+            table[away_code]["Diff"] = table[away_code]["GF"] - table[away_code]["GA"]
 
         live_games_info.append(
             {
