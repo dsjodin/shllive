@@ -164,8 +164,10 @@ function renderSchedule(schedule, liveGames) {
       middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
     }
 
+    // In the mockup, simulate that DIF-SAIK was the last updated game
+    const justUpdated = live && g.home_code === 'DIF' && g.away_code === 'SAIK';
     const card = document.createElement('div');
-    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '');
+    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '') + (justUpdated ? ' just-updated' : '');
     card.innerHTML = `
       <div class="sched-teams">
         <div class="sched-team-block">
@@ -229,7 +231,6 @@ function renderStandings(standings, liveGames) {
       </td>
       <td class="col-team">
         <div class="team-inner">
-          ${isLive ? '<span class="live-indicator"></span>' : ''}
           <span class="team-logo-fallback">${esc(code.slice(0,3))}</span>
           <span class="team-full-name">${esc(name)}</span>
         </div>

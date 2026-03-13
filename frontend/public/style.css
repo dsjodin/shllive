@@ -393,6 +393,13 @@ tbody tr.zone-kval { border-left: none; }
   border-color: var(--live-red);
   background: #FFFBF0;
 }
+.schedule-game-card.just-updated {
+  animation: card-flash .9s ease-out forwards;
+}
+@keyframes card-flash {
+  0%   { background: #FFFDE0; border-color: #F0A500; }
+  100% { background: #FFFBF0; border-color: var(--live-red); }
+}
 .sched-teams {
   display: flex;
   align-items: center;

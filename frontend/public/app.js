@@ -57,6 +57,10 @@ async function fetchAndRender() {
 
 /* ── Render ─────────────────────────────────────────────────────── */
 function render(data) {
+  // Detect which live game changed score since last render
+  const prevGames = lastPayload?.live_games ?? [];
+  const changedKey = detectScoreChange(prevGames, data.live_games ?? []);
+
   lastPayload = data;
 
   const { standings = [], live_games = [], has_live = false, schedule = {}, logos = {}, updated_at } = data;
@@ -73,14 +77,26 @@ function render(data) {
   document.getElementById('live-note').classList.toggle('hidden', !has_live);
 
   // Upcoming round (with live scores merged in)
-  renderSchedule(schedule, logos, live_games);
+  renderSchedule(schedule, logos, live_games, changedKey);
 
   // Standings table
   renderStandings(standings, live_games, logos);
 }
 
+/* Returns "HOMECODE-AWAYCODE" for the game whose score changed, or null */
+function detectScoreChange(prev, curr) {
+  const prevMap = {};
+  for (const g of prev) prevMap[`${g.home_team_code}-${g.away_team_code}`] = g;
+  for (const g of curr) {
+    const key  = `${g.home_team_code}-${g.away_team_code}`;
+    const old  = prevMap[key];
+    if (old && (old.home_score !== g.home_score || old.away_score !== g.away_score)) return key;
+  }
+  return null;
+}
+
 /* ── Upcoming round (with live scores merged in) ────────────────── */
-function renderSchedule(schedule, logos = {}, liveGames = []) {
+function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null) {
   // Build lookup: "HOMECODE-AWAYCODE" → live game object
   const liveMap = {};
   for (const g of liveGames) {
@@ -134,8 +150,10 @@ function renderSchedule(schedule, logos = {}, liveGames = []) {
       middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
     }
 
+    const key  = `${g.home_code}-${g.away_code}`;
     const card = document.createElement('div');
-    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '');
+    const justUpdated = live && key === changedKey;
+    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '') + (justUpdated ? ' just-updated' : '');
     card.innerHTML = `
       <div class="sched-teams">
         <div class="sched-team-block">
@@ -237,7 +255,6 @@ function renderStandings(standings, liveGames, logos = {}) {
       </td>
       <td class="col-team">
         <div class="team-inner">
-          ${isLive ? '<span class="live-indicator"></span>' : ''}
           ${logoHtml}
           <span class="team-full-name">${esc(name)}</span>
         </div>
