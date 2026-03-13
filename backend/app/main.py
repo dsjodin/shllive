@@ -7,11 +7,27 @@ from typing import Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+import os
+
 from .shl_client import SHLClient
+from .swehockey_client import SweHockeyClient
 from .standings import calculate_live_standings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Data client – prefer official SHL API; fall back to swehockey.se scraper
+# ---------------------------------------------------------------------------
+_use_shl_api = bool(os.getenv("SHL_CLIENT_ID") and os.getenv("SHL_CLIENT_SECRET"))
+if _use_shl_api:
+    shl: SHLClient | SweHockeyClient = SHLClient()
+    logger.info("Using official SHL Open API")
+else:
+    shl = SweHockeyClient()
+    logger.info(
+        "SHL_CLIENT_ID/SHL_CLIENT_SECRET not set – using swehockey.se scraper"
+    )
 
 # ---------------------------------------------------------------------------
 # Simple in-memory cache
@@ -24,8 +40,6 @@ _cache: dict[str, Any] = {
 }
 STANDINGS_TTL = 300   # 5 minutes
 GAMES_TTL = 30        # 30 seconds
-
-shl = SHLClient()
 
 
 async def _fetch_standings() -> list[dict]:
