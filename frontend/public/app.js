@@ -59,7 +59,7 @@ async function fetchAndRender() {
 function render(data) {
   lastPayload = data;
 
-  const { standings = [], live_games = [], has_live = false, schedule = {}, updated_at } = data;
+  const { standings = [], live_games = [], has_live = false, schedule = {}, logos = {}, updated_at } = data;
 
   // Header badges
   document.getElementById('live-badge').classList.toggle('hidden', !has_live);
@@ -76,10 +76,10 @@ function render(data) {
   renderLiveGames(live_games, has_live);
 
   // Upcoming round
-  renderSchedule(schedule);
+  renderSchedule(schedule, logos);
 
   // Standings table
-  renderStandings(standings, live_games);
+  renderStandings(standings, live_games, logos);
 }
 
 /* ── Live games panel ───────────────────────────────────────────── */
@@ -126,7 +126,7 @@ function renderLiveGames(liveGames, hasLive) {
 }
 
 /* ── Upcoming round ─────────────────────────────────────────────── */
-function renderSchedule(schedule) {
+function renderSchedule(schedule, logos = {}) {
   const section = document.getElementById('schedule-section');
   const games   = schedule?.games ?? [];
   const roundDate = schedule?.round_date;
@@ -157,24 +157,32 @@ function renderSchedule(schedule) {
   for (const g of games) {
     const card = document.createElement('div');
     card.className = 'schedule-game-card' + (g.played ? ' played' : '');
+    const homeLogo = logos[g.home_code] ? `<img class="sched-logo" src="${esc(logos[g.home_code])}" alt="${esc(g.home_code)}" onerror="this.style.display='none'">` : '';
+    const awayLogo = logos[g.away_code] ? `<img class="sched-logo" src="${esc(logos[g.away_code])}" alt="${esc(g.away_code)}" onerror="this.style.display='none'">` : '';
     card.innerHTML = `
       <div class="sched-teams">
-        <span class="sched-code">${esc(g.home_code)}</span>
-        <span class="sched-sep">–</span>
-        <span class="sched-code">${esc(g.away_code)}</span>
+        <div class="sched-team-block">
+          ${homeLogo}
+          <span class="sched-code">${esc(g.home_code)}</span>
+        </div>
+        <div class="sched-middle">
+          ${g.played
+            ? `<span class="sched-result">${esc(g.result)}</span>`
+            : `<span class="sched-time">${esc(g.time)}</span>`
+          }
+        </div>
+        <div class="sched-team-block">
+          <span class="sched-code">${esc(g.away_code)}</span>
+          ${awayLogo}
+        </div>
       </div>
-      <div class="sched-names">${esc(g.home_team)} – ${esc(g.away_team)}</div>
-      ${g.played
-        ? `<div class="sched-result">${esc(g.result)}</div>`
-        : `<div class="sched-time">${esc(g.time)}</div>`
-      }
     `;
     grid.appendChild(card);
   }
 }
 
 /* ── Standings table ────────────────────────────────────────────── */
-function renderStandings(standings, liveGames) {
+function renderStandings(standings, liveGames, logos = {}) {
   const liveCodes = new Set();
   const livePts   = {};
   for (const g of liveGames) {
@@ -239,25 +247,32 @@ function renderStandings(standings, liveGames) {
       ? `<span class="${diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : ''}">${diff > 0 ? '+' : ''}${diff}</span>`
       : diff;
 
+    const logoUrl = logos[code];
+    const logoHtml = logoUrl
+      ? `<img class="team-logo" src="${esc(logoUrl)}" alt="${esc(code)}" onerror="this.style.display='none'">`
+      : `<span class="team-logo-fallback">${esc(code.slice(0,3))}</span>`;
+
     const tr = document.createElement('tr');
     tr.className = ZONE_CLASS(rank);
     if (isLive) tr.classList.add('is-live');
 
     tr.innerHTML = `
-      <td class="col-rank">${rank}</td>
+      <td class="col-rank">
+        <span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}
+      </td>
       <td class="col-team">
         ${isLive ? '<span class="live-indicator"></span>' : ''}
-        ${esc(code)}
-        <span class="team-name-abbr">${esc(name)}</span>
+        ${logoHtml}
+        <span class="team-full-name">${esc(name)}</span>
       </td>
       <td class="col-num">${gp}</td>
       <td class="col-num">${w}</td>
-      <td class="col-num">${otw}</td>
-      <td class="col-num">${otl}</td>
+      <td class="col-num hide-sm">${otw}</td>
+      <td class="col-num hide-sm">${otl}</td>
       <td class="col-num">${l}</td>
-      <td class="col-num">${gf}</td>
-      <td class="col-num">${ga}</td>
-      <td class="col-num">${diffStr}</td>
+      <td class="col-num hide-md">${gf}</td>
+      <td class="col-num hide-md">${ga}</td>
+      <td class="col-num hide-sm">${diffStr}</td>
       <td class="col-pts">${pts}${deltaStr}</td>
     `;
     tbody.appendChild(tr);

@@ -28,10 +28,13 @@ _cache: dict[str, Any] = {
     "games_ts": 0.0,
     "schedule": None,
     "schedule_ts": 0.0,
+    "logos": None,
+    "logos_ts": 0.0,
 }
-STANDINGS_TTL = 300   # 5 minutes
-GAMES_TTL = 30        # 30 seconds
-SCHEDULE_TTL = 600    # 10 minutes
+STANDINGS_TTL = 300      # 5 minutes
+GAMES_TTL     = 30       # 30 seconds
+SCHEDULE_TTL  = 600      # 10 minutes
+LOGOS_TTL     = 86_400   # 24 hours
 
 
 async def _fetch_standings() -> list[dict]:
@@ -82,10 +85,26 @@ async def _fetch_schedule() -> dict:
         return {"round_date": None, "games": []}
 
 
+async def _fetch_logos() -> dict:
+    now = time.time()
+    if _cache["logos"] is not None and now - _cache["logos_ts"] < LOGOS_TTL:
+        return _cache["logos"]
+    try:
+        data = await shl.get_team_logos()
+        if data:  # only store if we got results
+            _cache["logos"] = data
+            _cache["logos_ts"] = now
+        return _cache["logos"] or {}
+    except Exception as exc:
+        logger.error("Failed to fetch team logos: %s", exc)
+        return _cache["logos"] or {}
+
+
 async def _build_payload() -> dict:
     standings = await _fetch_standings()
     games = await _fetch_games()
     schedule = await _fetch_schedule()
+    logos = await _fetch_logos()
     live_table, live_games = calculate_live_standings(standings, games)
     has_live = len(live_games) > 0
     return {
@@ -94,6 +113,7 @@ async def _build_payload() -> dict:
         "has_live": has_live,
         "base_standings": standings,
         "schedule": schedule,
+        "logos": logos,
         "season": shl.season,
         "updated_at": time.time(),
     }
@@ -104,12 +124,14 @@ async def _build_payload() -> dict:
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm up cache on startup (best-effort)
+    # Warm up caches on startup (best-effort, logos fetched separately as they're slow)
     try:
         await _build_payload()
         logger.info("Cache warmed up successfully")
     except Exception as exc:
         logger.warning("Startup cache warm-up failed: %s", exc)
+    # Fetch logos in background so startup isn't blocked
+    asyncio.create_task(_fetch_logos())
     yield
 
 
@@ -126,6 +148,12 @@ app.add_middleware(
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/team-logos")
+async def get_team_logos_endpoint():
+    """Team badge URLs fetched from TheSportsDB."""
+    return await _fetch_logos()
 
 
 @app.get("/api/standings")

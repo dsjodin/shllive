@@ -26,6 +26,25 @@ DEFAULT_GROUP_ID = os.getenv("SWE_GROUP_ID", "18263")
 
 # Canonical team-code lookup for current SHL clubs.
 # Keys are substrings that appear in the team name on swehockey.se.
+# TheSportsDB team page IDs – used to fetch team badge/logo URLs.
+# Browse to https://www.thesportsdb.com/team/{id} to verify.
+TSDB_TEAM_IDS: dict[str, int] = {
+    "SAIK": 135147,   # Skellefteå AIK
+    "FHC":  135140,   # Frölunda HC
+    "RBK":  135489,   # Rögle BK
+    "BRY":  135138,   # Brynäs IF
+    "FBK":  135141,   # Färjestad BK
+    "LHF":  135145,   # Luleå HF
+    "DIF":  135139,   # Djurgårdens IF
+    "MIF":  135487,   # IF Malmö Redhawks
+    "OHK":  135149,   # Örebro HK
+    "TIK":  137305,   # Timrå IK
+    "LIF":  137304,   # Leksands IF
+    "HV71": 135142,   # HV71
+    "VLH":  135148,   # Växjö Lakers HC
+    "LHC":  135144,   # Linköping HC
+}
+
 TEAM_CODE_MAP: dict[str, str] = {
     "Brynäs": "BRY",
     "Djurgård": "DIF",
@@ -100,6 +119,37 @@ class SweHockeyClient:
         """Return today's and next upcoming round of games."""
         html = await self._get(f"/ScheduleAndResults/Schedule/{self.group_id}")
         return _parse_schedule(html)
+
+    async def get_team_logos(self) -> dict[str, str]:
+        """
+        Fetch team badge URLs from TheSportsDB.
+        Returns {team_code: badge_url} for all known SHL teams.
+        """
+        badge_re = re.compile(
+            r"r2\.thesportsdb\.com/images/media/team/badge/[^.\"']+\.png"
+        )
+        logos: dict[str, str] = {}
+        async with httpx.AsyncClient(
+            timeout=15,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Referer": "https://www.thesportsdb.com/",
+            },
+            follow_redirects=True,
+        ) as client:
+            for code, team_id in TSDB_TEAM_IDS.items():
+                try:
+                    resp = await client.get(
+                        f"https://www.thesportsdb.com/team/{team_id}"
+                    )
+                    m = badge_re.search(resp.text)
+                    if m:
+                        logos[code] = f"https://{m.group(0)}"
+                    else:
+                        logger.warning("TSDB: no badge found for %s (id=%s)", code, team_id)
+                except Exception as exc:
+                    logger.warning("TSDB fetch failed for %s: %s", code, exc)
+        return logos
 
 
 # ------------------------------------------------------------------
