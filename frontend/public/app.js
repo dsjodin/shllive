@@ -113,6 +113,10 @@ function renderSchedule(schedule, logos = {}, liveGames = []) {
   const grid = document.getElementById('schedule-games');
   grid.innerHTML = '';
 
+  // Set grid columns: ≤4 games → one row; more → split into 2 rows
+  const cols = games.length <= 4 ? games.length : Math.ceil(games.length / 2);
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
   for (const g of games) {
     const live = liveMap[`${g.home_code}-${g.away_code}`] || null;
     const homeLogo = logos[g.home_code] ? `<img class="sched-logo" src="${esc(logos[g.home_code])}" alt="${esc(g.home_code)}" onerror="this.style.display='none'">` : '';

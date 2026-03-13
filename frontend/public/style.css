@@ -364,8 +364,7 @@ tbody tr.zone-kval { border-left: none; }
 }
 
 .schedule-games-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
   gap: .45rem;
 }
 
@@ -373,10 +372,9 @@ tbody tr.zone-kval { border-left: none; }
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: .4rem .7rem;
-  width: 165px;
-  flex: 0 0 165px;
+  padding: .45rem .8rem;
   text-align: center;
+  min-width: 0;
 }
 .schedule-game-card.played {
   opacity: .7;
