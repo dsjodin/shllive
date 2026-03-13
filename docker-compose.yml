@@ -1,0 +1,34 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - SHL_CLIENT_ID=${SHL_CLIENT_ID}
+      - SHL_CLIENT_SECRET=${SHL_CLIENT_SECRET}
+      - SHL_SEASON=${SHL_SEASON:-2025}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - shl-net
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - shl-net
+
+networks:
+  shl-net:
+    driver: bridge

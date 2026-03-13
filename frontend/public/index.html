@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHL Tabell – Live</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>
+        <span class="shl-logo">SHL</span>
+        Tabell
+      </h1>
+      <div class="header-right">
+        <span id="live-badge" class="live-badge hidden">
+          <span class="pulse-dot"></span> LIVE
+        </span>
+        <span id="updated-label" class="updated-label"></span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Live games panel (hidden when no games are live) -->
+    <section id="live-section" class="live-section hidden">
+      <h2 class="section-title">Pågående matcher</h2>
+      <div id="live-games" class="live-games-grid"></div>
+    </section>
+
+    <!-- Standings table -->
+    <section class="table-section">
+      <div class="table-header-row">
+        <h2 class="section-title" id="table-title">Tabell</h2>
+        <span id="live-note" class="live-note hidden">
+          * Inkluderar pågående matcher (projicerat resultat)
+        </span>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="standings-table">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="col-team">Lag</th>
+              <th class="col-num" title="Spelade matcher">SM</th>
+              <th class="col-num" title="Vinster">V</th>
+              <th class="col-num" title="Vinster övertid/straffar">OT/PS+</th>
+              <th class="col-num" title="Förluster övertid/straffar">OT/PS-</th>
+              <th class="col-num" title="Förluster">F</th>
+              <th class="col-num" title="Gjorda mål">GM</th>
+              <th class="col-num" title="Insläppta mål">IM</th>
+              <th class="col-num" title="Målskillnad">+/-</th>
+              <th class="col-pts" title="Poäng">P</th>
+            </tr>
+          </thead>
+          <tbody id="standings-body">
+            <tr class="loading-row">
+              <td colspan="11">Laddar tabell…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Data från SHL API &nbsp;·&nbsp; Uppdateras var 30:e sekund
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
