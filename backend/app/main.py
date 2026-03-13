@@ -26,9 +26,12 @@ _cache: dict[str, Any] = {
     "standings_ts": 0.0,
     "games": None,
     "games_ts": 0.0,
+    "schedule": None,
+    "schedule_ts": 0.0,
 }
 STANDINGS_TTL = 300   # 5 minutes
 GAMES_TTL = 30        # 30 seconds
+SCHEDULE_TTL = 600    # 10 minutes
 
 
 async def _fetch_standings() -> list[dict]:
@@ -63,9 +66,26 @@ async def _fetch_games() -> list[dict]:
         raise
 
 
+async def _fetch_schedule() -> dict:
+    now = time.time()
+    if _cache["schedule"] is not None and now - _cache["schedule_ts"] < SCHEDULE_TTL:
+        return _cache["schedule"]
+    try:
+        data = await shl.get_schedule()
+        _cache["schedule"] = data
+        _cache["schedule_ts"] = now
+        return data
+    except Exception as exc:
+        logger.error("Failed to fetch schedule: %s", exc)
+        if _cache["schedule"] is not None:
+            return _cache["schedule"]
+        return {"round_date": None, "games": []}
+
+
 async def _build_payload() -> dict:
     standings = await _fetch_standings()
     games = await _fetch_games()
+    schedule = await _fetch_schedule()
     live_table, live_games = calculate_live_standings(standings, games)
     has_live = len(live_games) > 0
     return {
@@ -73,6 +93,7 @@ async def _build_payload() -> dict:
         "live_games": live_games,
         "has_live": has_live,
         "base_standings": standings,
+        "schedule": schedule,
         "season": shl.season,
         "updated_at": time.time(),
     }

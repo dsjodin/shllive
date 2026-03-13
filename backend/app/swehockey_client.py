@@ -1,12 +1,9 @@
 """
-Fallback data client that scrapes stats.swehockey.se.
-
-Used when SHL Open API credentials (SHL_CLIENT_ID / SHL_CLIENT_SECRET) are
-not configured.  Returns data in the same shape as SHLClient so the rest of
-the application is unaffected.
+Data client that scrapes stats.swehockey.se.
 
 Standings URL:  https://stats.swehockey.se/ScheduleAndResults/Standings/{gid}
 Live URL:       https://stats.swehockey.se/ScheduleAndResults/Live/{gid}
+Schedule URL:   https://stats.swehockey.se/ScheduleAndResults/Schedule/{gid}
 """
 
 from __future__ import annotations
@@ -14,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from datetime import date
 from typing import Optional
 
 import httpx
@@ -30,13 +28,15 @@ DEFAULT_GROUP_ID = os.getenv("SWE_GROUP_ID", "18263")
 # Keys are substrings that appear in the team name on swehockey.se.
 TEAM_CODE_MAP: dict[str, str] = {
     "Brynäs": "BRY",
-    "Djurgården": "DIF",
+    "Djurgård": "DIF",
+    "Färjestad": "FBK",
     "Frölunda": "FHC",
+    "HV 71": "HV71",
     "HV71": "HV71",
     "Leksands": "LIF",
     "Linköping": "LHC",
     "Luleå": "LHF",
-    "Malmö": "MR",
+    "Malmö": "MIF",
     "Modo": "MOD",
     "Örebro": "OHK",
     "Rögle": "RBK",
@@ -95,6 +95,11 @@ class SweHockeyClient:
         """Return today's live games in SHL-API-compatible format."""
         html = await self._get(f"/ScheduleAndResults/Live/{self.group_id}")
         return _parse_live_games(html)
+
+    async def get_schedule(self) -> dict:
+        """Return today's and next upcoming round of games."""
+        html = await self._get(f"/ScheduleAndResults/Schedule/{self.group_id}")
+        return _parse_schedule(html)
 
 
 # ------------------------------------------------------------------
@@ -244,3 +249,85 @@ def _parse_live_games(html: str) -> list[dict]:
         )
 
     return games
+
+
+def _parse_schedule(html: str) -> dict:
+    """
+    Parse the schedule page and return today's games and the next upcoming round.
+
+    Returns:
+        {
+            "round_date": "YYYY-MM-DD",
+            "games": [
+                {
+                    "time": "HH:MM",
+                    "home_team": str,
+                    "home_code": str,
+                    "away_team": str,
+                    "away_code": str,
+                    "result": str | None,   # e.g. "3-2", None if not played
+                    "played": bool,
+                }
+            ]
+        }
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    table = soup.find("table", class_="tblContent")
+    if table is None:
+        return {"round_date": None, "games": []}
+
+    today = str(date.today())
+    date_re = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    # Non-breaking-space dash used as separator between team names
+    team_sep_re = re.compile(r"\s*\xa0-\xa0\s*")
+    result_re = re.compile(r"(\d+)\s*\xa0-\xa0\s*(\d+)")
+
+    # Collect all rounds (date → list of game dicts)
+    rounds: dict[str, list[dict]] = {}
+    current_date: str | None = None
+
+    for tr in table.find_all("tr"):
+        cells = [td.get_text(separator=" ", strip=True) for td in tr.find_all("td")]
+        if not cells:
+            continue
+        c0 = cells[0].strip()
+        if date_re.match(c0):
+            current_date = c0
+            continue
+        if current_date is None or len(cells) < 4:
+            continue
+
+        game_text = cells[3]
+        parts = team_sep_re.split(game_text)
+        if len(parts) < 2:
+            continue
+
+        home_team = " ".join(parts[0].split())
+        away_team = " ".join(parts[1].split())
+        time_str  = cells[0].strip()
+        result_raw = cells[4].strip() if len(cells) > 4 else ""
+        rm = result_re.search(result_raw)
+        result    = f"{rm.group(1)}-{rm.group(2)}" if rm else None
+        played    = rm is not None
+
+        rounds.setdefault(current_date, []).append({
+            "time":      time_str,
+            "home_team": home_team,
+            "home_code": _team_code(home_team),
+            "away_team": away_team,
+            "away_code": _team_code(away_team),
+            "result":    result,
+            "played":    played,
+        })
+
+    # Find the best round to show:
+    # 1. Today's games if any exist (live or already finished today)
+    # 2. Otherwise the first upcoming date with unplayed games
+    if today in rounds:
+        return {"round_date": today, "games": rounds[today]}
+
+    for d in sorted(rounds):
+        if d > today and any(not g["played"] for g in rounds[d]):
+            return {"round_date": d, "games": rounds[d]}
+
+    return {"round_date": None, "games": []}

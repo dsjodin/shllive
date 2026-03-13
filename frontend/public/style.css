@@ -298,6 +298,92 @@ footer {
   background: var(--surface);
 }
 
+/* ── Standings zone rows ──────────────────────────────────────── */
+/* Left-border accent per zone */
+tbody tr.zone-kval-direct { border-left: 3px solid var(--shl-blue); }
+tbody tr.zone-playin       { border-left: 3px solid #F0A500; }
+tbody tr.zone-mid          { border-left: 3px solid var(--border); }
+tbody tr.zone-kval         { border-left: 3px solid var(--live-red); }
+
+/* Zone separator rows */
+tr.zone-separator td {
+  padding: 0;
+  border-bottom: none;
+}
+tr.zone-separator:hover { background: transparent; }
+.zone-sep-label {
+  display: block;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: .18rem .75rem;
+}
+tr.zone-sep-playin .zone-sep-label { background: #FFF8E0; color: #A06800; border-top: 2px solid #F0A500; }
+tr.zone-sep-mid    .zone-sep-label { background: var(--bg); color: var(--text-muted); border-top: 2px solid var(--border); }
+tr.zone-sep-kval   .zone-sep-label { background: #FFF0F0; color: #B00000; border-top: 2px solid var(--live-red); }
+
+/* ── Schedule section ─────────────────────────────────────────── */
+.schedule-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+.schedule-games-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+}
+
+.schedule-game-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .5rem .85rem;
+  min-width: 175px;
+  flex: 1 1 175px;
+  text-align: center;
+}
+.schedule-game-card.played {
+  opacity: .7;
+}
+.sched-teams {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .5rem;
+  font-weight: 800;
+  font-size: .95rem;
+  color: var(--shl-blue);
+}
+.sched-sep {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.sched-names {
+  font-size: .65rem;
+  color: var(--text-muted);
+  margin-top: .15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sched-time {
+  font-size: .75rem;
+  font-weight: 700;
+  color: var(--shl-blue);
+  margin-top: .25rem;
+}
+.sched-result {
+  font-size: .85rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: .25rem;
+}
+
 /* ── Utility ──────────────────────────────────────────────────── */
 .hidden { display: none !important; }
 

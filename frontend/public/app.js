@@ -59,7 +59,7 @@ async function fetchAndRender() {
 function render(data) {
   lastPayload = data;
 
-  const { standings = [], live_games = [], has_live = false, updated_at } = data;
+  const { standings = [], live_games = [], has_live = false, schedule = {}, updated_at } = data;
 
   // Header badges
   document.getElementById('live-badge').classList.toggle('hidden', !has_live);
@@ -74,6 +74,9 @@ function render(data) {
 
   // Live games panel
   renderLiveGames(live_games, has_live);
+
+  // Upcoming round
+  renderSchedule(schedule);
 
   // Standings table
   renderStandings(standings, live_games);
@@ -122,6 +125,54 @@ function renderLiveGames(liveGames, hasLive) {
   }
 }
 
+/* ── Upcoming round ─────────────────────────────────────────────── */
+function renderSchedule(schedule) {
+  const section = document.getElementById('schedule-section');
+  const games   = schedule?.games ?? [];
+  const roundDate = schedule?.round_date;
+
+  if (!games.length) {
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+
+  // Format date as Swedish weekday + date
+  const titleEl = document.getElementById('schedule-title');
+  if (roundDate) {
+    const d = new Date(roundDate + 'T12:00:00');
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const roundDay = new Date(roundDate + 'T00:00:00');
+    const isToday = roundDay.toDateString() === today.toDateString();
+    const label = isToday
+      ? 'Dagens matcher'
+      : `Omgång ${d.toLocaleDateString('sv-SE', { weekday: 'long', month: 'short', day: 'numeric' })}`;
+    titleEl.textContent = label;
+  }
+
+  const grid = document.getElementById('schedule-games');
+  grid.innerHTML = '';
+
+  for (const g of games) {
+    const card = document.createElement('div');
+    card.className = 'schedule-game-card' + (g.played ? ' played' : '');
+    card.innerHTML = `
+      <div class="sched-teams">
+        <span class="sched-code">${esc(g.home_code)}</span>
+        <span class="sched-sep">–</span>
+        <span class="sched-code">${esc(g.away_code)}</span>
+      </div>
+      <div class="sched-names">${esc(g.home_team)} – ${esc(g.away_team)}</div>
+      ${g.played
+        ? `<div class="sched-result">${esc(g.result)}</div>`
+        : `<div class="sched-time">${esc(g.time)}</div>`
+      }
+    `;
+    grid.appendChild(card);
+  }
+}
+
 /* ── Standings table ────────────────────────────────────────────── */
 function renderStandings(standings, liveGames) {
   const liveCodes = new Set();
@@ -141,7 +192,32 @@ function renderStandings(standings, liveGames) {
     return;
   }
 
-  for (const entry of standings) {
+  // Zone boundaries (after these ranks insert a separator)
+  // 1-6: Direktkval  |  7-10: Play-in  |  11-12: Ingenmansland  |  13-14: Kvalspel
+  const ZONE_SEPARATORS = {
+    6:  { label: 'Play-in',         cls: 'zone-sep-playin' },
+    10: { label: 'Ingenmansland',   cls: 'zone-sep-mid'    },
+    12: { label: 'Kvalspel',        cls: 'zone-sep-kval'   },
+  };
+  const ZONE_CLASS = (rank) => {
+    if (rank <= 6)  return 'zone-kval-direct';
+    if (rank <= 10) return 'zone-playin';
+    if (rank <= 12) return 'zone-mid';
+    return 'zone-kval';
+  };
+
+  standings.forEach((entry, idx) => {
+    const rank = entry.rank ?? (idx + 1);
+
+    // Insert separator BEFORE this row if previous rank had a boundary
+    const sep = ZONE_SEPARATORS[rank - 1];
+    if (sep) {
+      const sepTr = document.createElement('tr');
+      sepTr.className = `zone-separator ${sep.cls}`;
+      sepTr.innerHTML = `<td colspan="11"><span class="zone-sep-label">${sep.label}</span></td>`;
+      tbody.appendChild(sepTr);
+    }
+
     const team       = entry.team || {};
     const code       = team.code || team.teamCode || entry.teamCode || '';
     const name       = team.name || code;
@@ -158,13 +234,13 @@ function renderStandings(standings, liveGames) {
     const ga   = entry.GA ?? entry.goalsAgainst ?? '–';
     const diff = entry.Diff ?? (typeof gf === 'number' && typeof ga === 'number' ? gf - ga : '–');
     const pts  = entry.Points ?? entry.points ?? '–';
-    const rank = entry.rank ?? '–';
 
     const diffStr = typeof diff === 'number'
       ? `<span class="${diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : ''}">${diff > 0 ? '+' : ''}${diff}</span>`
       : diff;
 
     const tr = document.createElement('tr');
+    tr.className = ZONE_CLASS(rank);
     if (isLive) tr.classList.add('is-live');
 
     tr.innerHTML = `
@@ -185,7 +261,7 @@ function renderStandings(standings, liveGames) {
       <td class="col-pts">${pts}${deltaStr}</td>
     `;
     tbody.appendChild(tr);
-  }
+  });
 }
 
 /* ── Error state ────────────────────────────────────────────────── */
