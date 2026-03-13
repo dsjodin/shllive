@@ -103,53 +103,42 @@ class SweHockeyClient:
 
 def _parse_standings(html: str) -> list[dict]:
     """
-    Parse the first standings table from the Standings page.
+    Parse the standings table from stats.swehockey.se.
 
-    Expected columns (may vary by season):
-        RK, Team, GP, W, T, L, GF:GA, GD, TP, OTW, OTL, GWSW, GWSL
+    The first table with class 'tblContent' holds the full standings.
+    Column order (positional):
+        0=RK, 1=TeamName, 2=GP, 3=W, 4=T, 5=L,
+        6=GF:GA(GD), 7=GD, 8=TP, 9=OTW, 10=OTL, 11=GWSW, 12=GWSL
     """
     soup = BeautifulSoup(html, "html.parser")
 
-    # Find the first table that looks like a standings table
-    table = None
-    for t in soup.find_all("table"):
-        headers = [th.get_text(strip=True).upper() for th in t.find_all("th")]
-        if any(h in ("RK", "TP", "GP") for h in headers):
-            table = t
-            break
-
+    table = soup.find("table", class_="tblContent")
     if table is None:
         logger.warning("SweHockey: standings table not found")
         return []
 
-    headers = [th.get_text(strip=True) for th in table.find_all("th")]
-    # Normalize header names
-    col = {h.upper(): i for i, h in enumerate(headers)}
-
     rows = []
-    for tr in table.find_all("tr")[1:]:  # skip header row
-        cells = [td.get_text(strip=True) for td in tr.find_all("td")]
-        if len(cells) < 3:
+    for tr in table.find_all("tr"):
+        cells = [td.get_text(separator=" ", strip=True) for td in tr.find_all("td")]
+        # Need at least: RK, Name, GP, W, T, L, GF:GA, GD, TP
+        if len(cells) < 9:
+            continue
+        if not cells[0].isdigit():
             continue
 
-        def _get(key: str, default="0") -> str:
-            idx = col.get(key)
-            if idx is None or idx >= len(cells):
-                return default
-            return cells[idx] or default
-
-        name = _get("TEAM", cells[1] if len(cells) > 1 else "Unknown")
+        name = cells[1]
         code = _team_code(name)
-        gf, ga = _parse_gf_ga(_get("GF:GA", "0:0"))
+        gf, ga = _parse_gf_ga(cells[6])
 
         try:
-            gp = int(_get("GP"))
-            wins = int(_get("W", "0"))
-            ties = int(_get("T", "0"))
-            losses = int(_get("L", "0"))
-            pts = int(_get("TP", "0"))
-            otw = int(_get("OTW", "0"))
-            otl = int(_get("OTL", "0"))
+            gp  = int(cells[2])
+            w   = int(cells[3])
+            t   = int(cells[4])
+            l   = int(cells[5])
+            gd  = int(cells[7])
+            pts = int(cells[8])
+            otw = int(cells[9])  if len(cells) > 9  else 0
+            otl = int(cells[10]) if len(cells) > 10 else 0
         except ValueError:
             continue
 
@@ -158,14 +147,14 @@ def _parse_standings(html: str) -> list[dict]:
                 "team": {"code": code, "name": name},
                 "Points": pts,
                 "GP": gp,
-                "W": wins,
-                "T": ties,
-                "L": losses,
+                "W": w,
+                "T": t,
+                "L": l,
                 "OTW": otw,
                 "OTL": otl,
                 "GF": gf,
                 "GA": ga,
-                "Diff": gf - ga,
+                "Diff": gd,
             }
         )
 
