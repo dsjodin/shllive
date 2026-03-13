@@ -252,13 +252,13 @@ function renderStandings(standings, liveGames, logos = {}) {
         </div>
       </td>
       <td class="col-num">${gp}</td>
-      <td class="col-num">${w}</td>
+      <td class="col-num hide-sm">${w}</td>
       <td class="col-num hide-sm">${otw}</td>
       <td class="col-num hide-sm">${otl}</td>
-      <td class="col-num">${l}</td>
-      <td class="col-num hide-md">${gf}</td>
-      <td class="col-num hide-md">${ga}</td>
-      <td class="col-num hide-sm">${diffStr}</td>
+      <td class="col-num hide-sm">${l}</td>
+      <td class="col-num hide-md show-xs">${gf}</td>
+      <td class="col-num hide-md show-xs">${ga}</td>
+      <td class="col-num">${diffStr}</td>
       <td class="col-pts">${pts}${deltaStr}</td>
     `;
     tbody.appendChild(tr);

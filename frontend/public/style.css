@@ -454,6 +454,8 @@ tbody tr.zone-kval { border-left: none; }
 }
 @media (max-width: 520px) {
   .hide-sm { display: none; }
+  /* Show GF/GA/diff on mobile even though they're hidden at tablet width */
+  .show-xs { display: table-cell !important; }
   .team-full-name { font-size: .78rem; }
   .team-logo, .team-logo-fallback { width: 18px; height: 18px; }
 }
