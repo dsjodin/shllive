@@ -482,6 +482,7 @@ tbody tr.zone-kval { border-left: none; }
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .hide-md { display: none; }
+  .schedule-games-grid { grid-template-columns: repeat(3, 1fr) !important; }
 }
 @media (max-width: 520px) {
   .hide-sm { display: none; }
@@ -489,4 +490,6 @@ tbody tr.zone-kval { border-left: none; }
   .show-xs { display: table-cell !important; }
   .team-full-name { font-size: .78rem; }
   .team-logo, .team-logo-fallback { width: 18px; height: 18px; }
+  .schedule-games-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .sched-logo { width: 18px; height: 18px; }
 }
