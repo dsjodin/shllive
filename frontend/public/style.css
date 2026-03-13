@@ -236,8 +236,8 @@ tbody tr {
 }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: #F5F7FB; }
-tbody tr.is-live { background: #FFFBF0; }
-tbody tr.is-live:hover { background: #FFF3D0; }
+tbody tr.is-live { background: #FEFCE8; }
+tbody tr.is-live:hover { background: #FDF8C0; }
 
 td {
   padding: .38rem .5rem;
@@ -403,10 +403,10 @@ tbody tr.zone-kval { border-left: none; }
   0%, 100% { border-color: var(--live-red); }
   50%       { border-color: transparent;    }
 }
-/* Score digit blink – only the team that scored, ~30 s */
+/* Score digit blink – only the scoring team's number, runs until next goal */
 .score-digit { display: inline-block; }
 .score-digit.score-blink {
-  animation: score-blink 1.4s ease-in-out 21;   /* 21 × 1.4s ≈ 29s */
+  animation: score-blink 1.4s ease-in-out infinite;
 }
 @keyframes score-blink {
   0%, 100% { opacity: 1; }
