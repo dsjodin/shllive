@@ -381,6 +381,10 @@ tbody tr.zone-kval { border-left: none; }
 .schedule-game-card.played {
   opacity: .7;
 }
+.schedule-game-card.live {
+  border-color: var(--live-red);
+  background: #FFFBF0;
+}
 .sched-teams {
   display: flex;
   align-items: center;
@@ -409,13 +413,42 @@ tbody tr.zone-kval { border-left: none; }
 }
 .sched-middle {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
   min-width: 44px;
+  gap: .15rem;
 }
 .sched-time {
   font-size: .78rem;
   font-weight: 700;
   color: var(--text-muted);
+}
+.sched-live-score {
+  font-size: .9rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: .03em;
+}
+.sched-live-status {
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .62rem;
+  font-weight: 600;
+  color: var(--live-red);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.sched-live-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--live-red);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pulse 1.4s ease-in-out infinite;
 }
 .sched-result {
   font-size: .9rem;

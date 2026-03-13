@@ -72,61 +72,20 @@ function render(data) {
   // Live note under table title
   document.getElementById('live-note').classList.toggle('hidden', !has_live);
 
-  // Live games panel
-  renderLiveGames(live_games, has_live);
-
-  // Upcoming round
-  renderSchedule(schedule, logos);
+  // Upcoming round (with live scores merged in)
+  renderSchedule(schedule, logos, live_games);
 
   // Standings table
   renderStandings(standings, live_games, logos);
 }
 
-/* ── Live games panel ───────────────────────────────────────────── */
-function renderLiveGames(liveGames, hasLive) {
-  const section = document.getElementById('live-section');
-  section.classList.toggle('hidden', !hasLive);
-  if (!hasLive) return;
-
-  const grid = document.getElementById('live-games');
-  grid.innerHTML = '';
-
+/* ── Upcoming round (with live scores merged in) ────────────────── */
+function renderSchedule(schedule, logos = {}, liveGames = []) {
+  // Build lookup: "HOMECODE-AWAYCODE" → live game object
+  const liveMap = {};
   for (const g of liveGames) {
-    const homeLeads = g.home_score > g.away_score;
-    const awayLeads = g.away_score > g.home_score;
-    const tied      = g.home_score === g.away_score;
-
-    const homeClass = homeLeads ? 'leading' : awayLeads ? 'trailing' : 'tied';
-    const awayClass = awayLeads ? 'leading' : homeLeads ? 'trailing' : 'tied';
-
-    const card = document.createElement('div');
-    card.className = 'live-game-card';
-    card.innerHTML = `
-      <div class="teams">
-        <div class="team-block">
-          <span class="team-code">${esc(g.home_team_code)}</span>
-          <span class="team-score ${homeClass}">${g.home_score}</span>
-        </div>
-        <span class="score-sep">–</span>
-        <div class="team-block">
-          <span class="team-score ${awayClass}">${g.away_score}</span>
-          <span class="team-code">${esc(g.away_team_code)}</span>
-        </div>
-      </div>
-      <div class="game-status">${esc(g.status)}</div>
-      <div class="projected-pts">
-        ${tied
-          ? 'OT-prognos: +1p vardera'
-          : `Prognos: ${esc(homeLeads ? g.home_team_code : g.away_team_code)} +3p`
-        }
-      </div>
-    `;
-    grid.appendChild(card);
+    liveMap[`${g.home_team_code}-${g.away_team_code}`] = g;
   }
-}
-
-/* ── Upcoming round ─────────────────────────────────────────────── */
-function renderSchedule(schedule, logos = {}) {
   const section = document.getElementById('schedule-section');
   const games   = schedule?.games ?? [];
   const roundDate = schedule?.round_date;
@@ -155,22 +114,31 @@ function renderSchedule(schedule, logos = {}) {
   grid.innerHTML = '';
 
   for (const g of games) {
-    const card = document.createElement('div');
-    card.className = 'schedule-game-card' + (g.played ? ' played' : '');
+    const live = liveMap[`${g.home_code}-${g.away_code}`] || null;
     const homeLogo = logos[g.home_code] ? `<img class="sched-logo" src="${esc(logos[g.home_code])}" alt="${esc(g.home_code)}" onerror="this.style.display='none'">` : '';
     const awayLogo = logos[g.away_code] ? `<img class="sched-logo" src="${esc(logos[g.away_code])}" alt="${esc(g.away_code)}" onerror="this.style.display='none'">` : '';
+
+    let middleHtml;
+    if (live) {
+      middleHtml = `
+        <span class="sched-live-score">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
+      `;
+    } else if (g.played) {
+      middleHtml = `<span class="sched-result">${esc(g.result)}</span>`;
+    } else {
+      middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '');
     card.innerHTML = `
       <div class="sched-teams">
         <div class="sched-team-block">
           ${homeLogo}
           <span class="sched-code">${esc(g.home_code)}</span>
         </div>
-        <div class="sched-middle">
-          ${g.played
-            ? `<span class="sched-result">${esc(g.result)}</span>`
-            : `<span class="sched-time">${esc(g.time)}</span>`
-          }
-        </div>
+        <div class="sched-middle">${middleHtml}</div>
         <div class="sched-team-block">
           <span class="sched-code">${esc(g.away_code)}</span>
           ${awayLogo}
