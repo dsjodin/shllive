@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHL Tabell – Live (mockup)</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .mockup-banner {
+      background: #7C3AED;
+      color: #fff;
+      text-align: center;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .06em;
+      padding: .35rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="mockup-banner">MOCKUP – visar hur sidan ser ut under en livesänd omgång</div>
+
+  <header>
+    <div class="header-inner">
+      <h1>
+        <span class="shl-logo">SHL</span>
+        Tabell
+      </h1>
+      <div class="header-right">
+        <span id="live-badge" class="live-badge">
+          <span class="pulse-dot"></span> LIVE
+        </span>
+        <span id="updated-label" class="updated-label">Uppdaterad 18:47:05</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="schedule-section" class="schedule-section">
+      <h2 class="section-title" id="schedule-title">Dagens matcher</h2>
+      <div id="schedule-games" class="schedule-games-grid"></div>
+    </section>
+
+    <section class="table-section">
+      <div class="table-header-row">
+        <h2 class="section-title">Tabell</h2>
+        <span class="live-note">* Inkluderar pågående matcher (projicerat resultat)</span>
+      </div>
+      <div class="table-wrapper">
+        <table id="standings-table">
+          <thead>
+            <tr>
+              <th class="col-rank">#</th>
+              <th class="col-team">Team</th>
+              <th class="col-num" title="Games Played">GP</th>
+              <th class="col-num hide-sm" title="Wins">W</th>
+              <th class="col-num hide-sm" title="Overtime/Shootout Wins">OT+</th>
+              <th class="col-num hide-sm" title="Overtime/Shootout Losses">OT-</th>
+              <th class="col-num hide-sm" title="Losses">L</th>
+              <th class="col-num hide-md show-xs" title="Goals For">GF</th>
+              <th class="col-num hide-md show-xs" title="Goals Against">GA</th>
+              <th class="col-num" title="Goal Difference">+/-</th>
+              <th class="col-pts" title="Points">PTS</th>
+            </tr>
+          </thead>
+          <tbody id="standings-body"></tbody>
+        </table>
+      </div>
+      <div class="zone-legend">
+        <span class="zone-legend-item"><span class="zone-legend-dot" style="background:var(--shl-blue)"></span>Slutspel: Kvartsfinal (1–6)</span>
+        <span class="zone-legend-item"><span class="zone-legend-dot" style="background:#F0A500"></span>Slutspel: 8-delsfinal (7–10)</span>
+        <span class="zone-legend-item"><span class="zone-legend-dot" style="background:#B0B8CC"></span>Ingenmansland (11–12)</span>
+        <span class="zone-legend-item"><span class="zone-legend-dot" style="background:#E03030"></span>Play out (13–14)</span>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Data från stats.swehockey.se &nbsp;·&nbsp; Uppdateras var 30:e sekund
+  </footer>
+
+<script>
+/* ── Mock data ──────────────────────────────────────────────────── */
+const MOCK = {
+  has_live: true,
+  updated_at: Math.floor(Date.now() / 1000),
+
+  schedule: {
+    round_date: new Date().toISOString().slice(0, 10),
+    games: [
+      { home_code:'BRY', away_code:'HV71',  time:'15:15', played:false, result:null },
+      { home_code:'FHC', away_code:'MIF',   time:'15:15', played:false, result:null },
+      { home_code:'LHC', away_code:'OHK',   time:'15:15', played:false, result:null },
+      { home_code:'LHF', away_code:'FBK',   time:'15:15', played:false, result:null },
+      { home_code:'DIF', away_code:'SAIK',  time:'15:15', played:false, result:null },
+      { home_code:'RBK', away_code:'LIF',   time:'15:15', played:false, result:null },
+      { home_code:'TIK', away_code:'VLH',   time:'15:15', played:false, result:null },
+    ],
+  },
+
+  // 4 pågående matcher, 3 ännu ej startade
+  live_games: [
+    { home_team_code:'FHC', away_team_code:'MIF',  home_score:3, away_score:1, status:'P2 47:23', home_projected_pts:2, away_projected_pts:0 },
+    { home_team_code:'DIF', away_team_code:'SAIK', home_score:2, away_score:2, status:'P3 12:44', home_projected_pts:1, away_projected_pts:1 },
+    { home_team_code:'RBK', away_team_code:'LIF',  home_score:4, away_score:0, status:'P3 58:01', home_projected_pts:2, away_projected_pts:0 },
+    { home_team_code:'BRY', away_team_code:'HV71', home_score:1, away_score:2, status:'P1 18:05', home_projected_pts:0, away_projected_pts:2 },
+  ],
+
+  standings: [
+    { rank:1,  team:{code:'FHC', name:'Frölunda HC'},       GP:51, W:29, OTW:6,  OTL:4,  L:12, GF:168, GA:121, Diff:47,  Points:103 },
+    { rank:2,  team:{code:'LHF', name:'Luleå HF'},          GP:51, W:27, OTW:5,  OTL:6,  L:13, GF:155, GA:118, Diff:37,  Points:97  },
+    { rank:3,  team:{code:'SAIK',name:'Skellefteå AIK'},    GP:51, W:26, OTW:6,  OTL:5,  L:14, GF:149, GA:122, Diff:27,  Points:95  },
+    { rank:4,  team:{code:'DIF', name:'Djurgårdens IF'},    GP:51, W:25, OTW:5,  OTL:7,  L:14, GF:143, GA:126, Diff:17,  Points:92  },
+    { rank:5,  team:{code:'FBK', name:'Färjestad BK'},      GP:51, W:24, OTW:4,  OTL:6,  L:17, GF:138, GA:131, Diff:7,   Points:86  },
+    { rank:6,  team:{code:'RBK', name:'Rögle BK'},          GP:51, W:22, OTW:7,  OTL:5,  L:17, GF:140, GA:129, Diff:11,  Points:85  },
+    { rank:7,  team:{code:'MIF', name:'IF Malmö Redhawks'}, GP:51, W:20, OTW:5,  OTL:8,  L:18, GF:128, GA:133, Diff:-5,  Points:78  },
+    { rank:8,  team:{code:'LHC', name:'Linköping HC'},      GP:51, W:19, OTW:6,  OTL:7,  L:19, GF:124, GA:137, Diff:-13, Points:76  },
+    { rank:9,  team:{code:'BRY', name:'Brynäs IF'},         GP:51, W:18, OTW:4,  OTL:9,  L:20, GF:118, GA:140, Diff:-22, Points:71  },
+    { rank:10, team:{code:'VLH', name:'Växjö Lakers HC'},   GP:51, W:17, OTW:5,  OTL:6,  L:23, GF:119, GA:148, Diff:-29, Points:67  },
+    { rank:11, team:{code:'OHK', name:'Örebro HK'},         GP:51, W:15, OTW:4,  OTL:8,  L:24, GF:112, GA:152, Diff:-40, Points:61  },
+    { rank:12, team:{code:'TIK', name:'Timrå IK'},          GP:51, W:13, OTW:5,  OTL:7,  L:26, GF:108, GA:157, Diff:-49, Points:56  },
+    { rank:13, team:{code:'LIF', name:'Leksands IF'},       GP:51, W:10, OTW:3,  OTL:6,  L:32, GF: 98, GA:171, Diff:-73, Points:42  },
+    { rank:14, team:{code:'HV71',name:'HV 71'},             GP:51, W: 9, OTW:2,  OTL:5,  L:35, GF: 94, GA:178, Diff:-84, Points:36  },
+  ],
+};
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+const ZONE_CLASS = (rank) => {
+  if (rank <= 6)  return 'zone-kval-direct';
+  if (rank <= 10) return 'zone-playin';
+  if (rank <= 12) return 'zone-mid';
+  return 'zone-kval';
+};
+
+/* ── Schedule ───────────────────────────────────────────────────── */
+function renderSchedule(schedule, liveGames) {
+  const liveMap = {};
+  for (const g of liveGames) liveMap[`${g.home_team_code}-${g.away_team_code}`] = g;
+
+  const games = schedule.games;
+  const grid  = document.getElementById('schedule-games');
+  grid.innerHTML = '';
+
+  const cols = games.length <= 4 ? games.length : Math.ceil(games.length / 2);
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+  for (const g of games) {
+    const live = liveMap[`${g.home_code}-${g.away_code}`] || null;
+
+    let middleHtml;
+    if (live) {
+      middleHtml = `
+        <span class="sched-live-score">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
+      `;
+    } else if (g.played) {
+      middleHtml = `<span class="sched-result">${esc(g.result)}</span>`;
+    } else {
+      middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
+    }
+
+    const card = document.createElement('div');
+    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '');
+    card.innerHTML = `
+      <div class="sched-teams">
+        <div class="sched-team-block">
+          <span class="sched-code">${esc(g.home_code)}</span>
+        </div>
+        <div class="sched-middle">${middleHtml}</div>
+        <div class="sched-team-block">
+          <span class="sched-code">${esc(g.away_code)}</span>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+/* ── Standings ──────────────────────────────────────────────────── */
+function renderStandings(standings, liveGames) {
+  const liveCodes = new Set();
+  const livePts   = {};
+  for (const g of liveGames) {
+    liveCodes.add(g.home_team_code);
+    liveCodes.add(g.away_team_code);
+    livePts[g.home_team_code] = (livePts[g.home_team_code] || 0) + g.home_projected_pts;
+    livePts[g.away_team_code] = (livePts[g.away_team_code] || 0) + g.away_projected_pts;
+  }
+
+  const tbody = document.getElementById('standings-body');
+  tbody.innerHTML = '';
+
+  for (const entry of standings) {
+    const rank     = entry.rank;
+    const code     = entry.team.code;
+    const name     = entry.team.name;
+    const isLive   = liveCodes.has(code);
+    const deltaRaw = livePts[code] || 0;
+    const deltaStr = deltaRaw > 0 ? `<span class="pts-live-delta">+${deltaRaw}</span>` : '';
+
+    const diff = entry.Diff;
+    const diffStr = `<span class="${diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : ''}">${diff > 0 ? '+' : ''}${diff}</span>`;
+
+    const tr = document.createElement('tr');
+    tr.className = ZONE_CLASS(rank);
+    if (isLive) tr.classList.add('is-live');
+
+    tr.innerHTML = `
+      <td class="col-rank">
+        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}</div>
+      </td>
+      <td class="col-team">
+        <div class="team-inner">
+          ${isLive ? '<span class="live-indicator"></span>' : ''}
+          <span class="team-logo-fallback">${esc(code.slice(0,3))}</span>
+          <span class="team-full-name">${esc(name)}</span>
+        </div>
+      </td>
+      <td class="col-num">${entry.GP}</td>
+      <td class="col-num hide-sm">${entry.W}</td>
+      <td class="col-num hide-sm">${entry.OTW}</td>
+      <td class="col-num hide-sm">${entry.OTL}</td>
+      <td class="col-num hide-sm">${entry.L}</td>
+      <td class="col-num hide-md show-xs">${entry.GF}</td>
+      <td class="col-num hide-md show-xs">${entry.GA}</td>
+      <td class="col-num">${diffStr}</td>
+      <td class="col-pts">${entry.Points}${deltaStr}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+/* ── Init ───────────────────────────────────────────────────────── */
+renderSchedule(MOCK.schedule, MOCK.live_games);
+renderStandings(MOCK.standings, MOCK.live_games);
+</script>
+</body>
+</html>
