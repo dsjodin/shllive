@@ -4,9 +4,10 @@ const WS_PATH     = '/ws';
 const POLL_MS     = 30_000;   // fallback polling interval
 
 /* ── State ─────────────────────────────────────────────────────── */
-let ws            = null;
-let pollTimer     = null;
-let lastPayload   = null;
+let ws              = null;
+let pollTimer       = null;
+let lastPayload     = null;
+let lastChangedKey  = null;  // persists until next score change
 
 /* ── Entry ─────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -58,8 +59,9 @@ async function fetchAndRender() {
 /* ── Render ─────────────────────────────────────────────────────── */
 function render(data) {
   // Detect which live game changed score since last render
-  const prevGames = lastPayload?.live_games ?? [];
+  const prevGames  = lastPayload?.live_games ?? [];
   const changedKey = detectScoreChange(prevGames, data.live_games ?? []);
+  if (changedKey) lastChangedKey = changedKey;
 
   lastPayload = data;
 
@@ -77,7 +79,7 @@ function render(data) {
   document.getElementById('live-note').classList.toggle('hidden', !has_live);
 
   // Upcoming round (with live scores merged in)
-  renderSchedule(schedule, logos, live_games, changedKey);
+  renderSchedule(schedule, logos, live_games, changedKey, lastChangedKey);
 
   // Standings table
   renderStandings(standings, live_games, logos);
@@ -96,7 +98,7 @@ function detectScoreChange(prev, curr) {
 }
 
 /* ── Upcoming round (with live scores merged in) ────────────────── */
-function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null) {
+function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null, lastUpdatedKey = null) {
   // Build lookup: "HOMECODE-AWAYCODE" → live game object
   const liveMap = {};
   for (const g of liveGames) {
@@ -138,10 +140,15 @@ function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null)
     const homeLogo = logos[g.home_code] ? `<img class="sched-logo" src="${esc(logos[g.home_code])}" alt="${esc(g.home_code)}" onerror="this.style.display='none'">` : '';
     const awayLogo = logos[g.away_code] ? `<img class="sched-logo" src="${esc(logos[g.away_code])}" alt="${esc(g.away_code)}" onerror="this.style.display='none'">` : '';
 
+    const key         = `${g.home_code}-${g.away_code}`;
+    const scoreJustChanged = live && key === changedKey;
+    const isLastUpdated    = live && key === lastUpdatedKey;
+
     let middleHtml;
     if (live) {
+      const scoreClass = scoreJustChanged ? ' score-flash' : '';
       middleHtml = `
-        <span class="sched-live-score">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-score${scoreClass}">${live.home_score}–${live.away_score}</span>
         <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
       `;
     } else if (g.played) {
@@ -150,10 +157,10 @@ function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null)
       middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
     }
 
-    const key  = `${g.home_code}-${g.away_code}`;
     const card = document.createElement('div');
-    const justUpdated = live && key === changedKey;
-    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '') + (justUpdated ? ' just-updated' : '');
+    card.className = 'schedule-game-card'
+      + (live ? ' live' : g.played ? ' played' : '')
+      + (isLastUpdated ? ' last-updated' : '');
     card.innerHTML = `
       <div class="sched-teams">
         <div class="sched-team-block">

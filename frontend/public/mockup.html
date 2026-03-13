@@ -152,10 +152,15 @@ function renderSchedule(schedule, liveGames) {
   for (const g of games) {
     const live = liveMap[`${g.home_code}-${g.away_code}`] || null;
 
+    // In the mockup, simulate that DIF-SAIK scored most recently
+    const isLastUpdated    = live && g.home_code === 'DIF' && g.away_code === 'SAIK';
+    const scoreJustChanged = isLastUpdated;
+
     let middleHtml;
     if (live) {
+      const scoreClass = scoreJustChanged ? ' score-flash' : '';
       middleHtml = `
-        <span class="sched-live-score">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-score${scoreClass}">${live.home_score}–${live.away_score}</span>
         <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
       `;
     } else if (g.played) {
@@ -164,10 +169,10 @@ function renderSchedule(schedule, liveGames) {
       middleHtml = `<span class="sched-time">${esc(g.time)}</span>`;
     }
 
-    // In the mockup, simulate that DIF-SAIK was the last updated game
-    const justUpdated = live && g.home_code === 'DIF' && g.away_code === 'SAIK';
     const card = document.createElement('div');
-    card.className = 'schedule-game-card' + (live ? ' live' : g.played ? ' played' : '') + (justUpdated ? ' just-updated' : '');
+    card.className = 'schedule-game-card'
+      + (live ? ' live' : g.played ? ' played' : '')
+      + (isLastUpdated ? ' last-updated' : '');
     card.innerHTML = `
       <div class="sched-teams">
         <div class="sched-team-block">
