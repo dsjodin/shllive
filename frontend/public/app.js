@@ -179,15 +179,34 @@ function renderStandings(standings, liveGames, logos = {}) {
     return 'zone-kval';
   };
 
-  standings.forEach((entry, idx) => {
-    const rank = entry.rank ?? (idx + 1);
+  // Enrich with projected points and sort live
+  const enriched = standings.map((entry, idx) => {
+    const team  = entry.team || {};
+    const code  = team.code || team.teamCode || entry.teamCode || '';
+    const pts   = entry.Points ?? entry.points ?? 0;
+    const diff  = entry.Diff ?? (typeof entry.GF === 'number' ? entry.GF - (entry.GA ?? 0) : 0);
+    const delta = livePts[code] || 0;
+    return { ...entry, _code: code, _origRank: entry.rank ?? (idx + 1), _projPts: pts + delta, _diff: diff };
+  });
 
-    const team       = entry.team || {};
-    const code       = team.code || team.teamCode || entry.teamCode || '';
-    const name       = team.name || code;
-    const isLive     = liveCodes.has(code);
-    const deltaRaw   = livePts[code] || 0;
-    const deltaStr   = deltaRaw > 0 ? `<span class="pts-live-delta">+${deltaRaw}</span>` : '';
+  // Re-sort by projected points desc, then goal diff desc
+  enriched.sort((a, b) => b._projPts - a._projPts || b._diff - a._diff);
+
+  enriched.forEach((entry, idx) => {
+    const newRank    = idx + 1;
+    const origRank   = entry._origRank;
+    const rankChange = origRank - newRank; // positive = moved up
+
+    const code     = entry._code;
+    const team     = entry.team || {};
+    const name     = team.name || code;
+    const isLive   = liveCodes.has(code);
+    const deltaRaw = livePts[code] || 0;
+    const deltaStr = deltaRaw > 0 ? `<span class="pts-live-delta">+${deltaRaw}</span>` : '';
+
+    let rankChangeHtml = '';
+    if (rankChange > 0) rankChangeHtml = `<span class="rank-change rank-change-up">▲${rankChange}</span>`;
+    if (rankChange < 0) rankChangeHtml = `<span class="rank-change rank-change-down">▼${Math.abs(rankChange)}</span>`;
 
     const gp   = entry.GP ?? entry.gamesPlayed ?? '–';
     const w    = entry.W ?? entry.wins ?? '–';
@@ -196,25 +215,25 @@ function renderStandings(standings, liveGames, logos = {}) {
     const l    = entry.L ?? entry.losses ?? '–';
     const gf   = entry.GF ?? entry.goalsFor ?? '–';
     const ga   = entry.GA ?? entry.goalsAgainst ?? '–';
-    const diff = entry.Diff ?? (typeof gf === 'number' && typeof ga === 'number' ? gf - ga : '–');
+    const diff = entry._diff;
     const pts  = entry.Points ?? entry.points ?? '–';
 
     const diffStr = typeof diff === 'number'
       ? `<span class="${diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : ''}">${diff > 0 ? '+' : ''}${diff}</span>`
       : diff;
 
-    const logoUrl = logos[code];
+    const logoUrl  = logos[code];
     const logoHtml = logoUrl
       ? `<img class="team-logo" src="${esc(logoUrl)}" alt="${esc(code)}" onerror="this.style.display='none'">`
       : `<span class="team-logo-fallback">${esc(code.slice(0,3))}</span>`;
 
     const tr = document.createElement('tr');
-    tr.className = ZONE_CLASS(rank);
+    tr.className = ZONE_CLASS(newRank);
     if (isLive) tr.classList.add('is-live');
 
     tr.innerHTML = `
       <td class="col-rank">
-        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}</div>
+        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(newRank)}-dot"></span>${newRank}${rankChangeHtml}</div>
       </td>
       <td class="col-team">
         <div class="team-inner">

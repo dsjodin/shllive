@@ -192,27 +192,40 @@ function renderStandings(standings, liveGames) {
     livePts[g.away_team_code] = (livePts[g.away_team_code] || 0) + g.away_projected_pts;
   }
 
+  // Enrich and re-sort by projected points
+  const enriched = standings.map(entry => ({
+    ...entry,
+    _origRank:  entry.rank,
+    _projPts:   entry.Points + (livePts[entry.team.code] || 0),
+  }));
+  enriched.sort((a, b) => b._projPts - a._projPts || b.Diff - a.Diff);
+
   const tbody = document.getElementById('standings-body');
   tbody.innerHTML = '';
 
-  for (const entry of standings) {
-    const rank     = entry.rank;
-    const code     = entry.team.code;
-    const name     = entry.team.name;
-    const isLive   = liveCodes.has(code);
-    const deltaRaw = livePts[code] || 0;
-    const deltaStr = deltaRaw > 0 ? `<span class="pts-live-delta">+${deltaRaw}</span>` : '';
+  enriched.forEach((entry, idx) => {
+    const newRank    = idx + 1;
+    const rankChange = entry._origRank - newRank;
+    const code       = entry.team.code;
+    const name       = entry.team.name;
+    const isLive     = liveCodes.has(code);
+    const deltaRaw   = livePts[code] || 0;
+    const deltaStr   = deltaRaw > 0 ? `<span class="pts-live-delta">+${deltaRaw}</span>` : '';
+
+    let rankChangeHtml = '';
+    if (rankChange > 0) rankChangeHtml = `<span class="rank-change rank-change-up">▲${rankChange}</span>`;
+    if (rankChange < 0) rankChangeHtml = `<span class="rank-change rank-change-down">▼${Math.abs(rankChange)}</span>`;
 
     const diff = entry.Diff;
     const diffStr = `<span class="${diff > 0 ? 'diff-pos' : diff < 0 ? 'diff-neg' : ''}">${diff > 0 ? '+' : ''}${diff}</span>`;
 
     const tr = document.createElement('tr');
-    tr.className = ZONE_CLASS(rank);
+    tr.className = ZONE_CLASS(newRank);
     if (isLive) tr.classList.add('is-live');
 
     tr.innerHTML = `
       <td class="col-rank">
-        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}</div>
+        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(newRank)}-dot"></span>${newRank}${rankChangeHtml}</div>
       </td>
       <td class="col-team">
         <div class="team-inner">

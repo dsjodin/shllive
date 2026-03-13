@@ -316,6 +316,16 @@ td.col-rank {
 .diff-pos { color: var(--live-green); font-weight: 600; }
 .diff-neg { color: var(--live-red);   font-weight: 600; }
 
+/* ── Rank change indicator ────────────────────────────────────── */
+.rank-change {
+  font-size: .6rem;
+  font-weight: 700;
+  margin-left: 3px;
+  vertical-align: middle;
+}
+.rank-change-up   { color: var(--live-green); }
+.rank-change-down { color: var(--live-red); }
+
 /* ── Zone dot in rank column ──────────────────────────────────── */
 .zone-dot {
   width: 4px;
