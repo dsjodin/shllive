@@ -242,12 +242,14 @@ function renderStandings(standings, liveGames, logos = {}) {
 
     tr.innerHTML = `
       <td class="col-rank">
-        <span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}
+        <div class="rank-inner"><span class="zone-dot ${ZONE_CLASS(rank)}-dot"></span>${rank}</div>
       </td>
       <td class="col-team">
-        ${isLive ? '<span class="live-indicator"></span>' : ''}
-        ${logoHtml}
-        <span class="team-full-name">${esc(name)}</span>
+        <div class="team-inner">
+          ${isLive ? '<span class="live-indicator"></span>' : ''}
+          ${logoHtml}
+          <span class="team-full-name">${esc(name)}</span>
+        </div>
       </td>
       <td class="col-num">${gp}</td>
       <td class="col-num">${w}</td>

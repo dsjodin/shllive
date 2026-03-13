@@ -248,11 +248,13 @@ td {
 td.col-team {
   text-align: left;
   font-weight: 500;
+  padding-left: .5rem;
+  min-width: 150px;
+}
+.team-inner {
   display: flex;
   align-items: center;
   gap: .45rem;
-  padding-left: .5rem;
-  min-width: 150px;
 }
 .team-full-name {
   font-size: .83rem;
@@ -304,10 +306,12 @@ td.col-rank {
   color: var(--text-muted);
   font-size: .8rem;
   font-weight: 500;
+  padding-left: .6rem;
+}
+.rank-inner {
   display: flex;
   align-items: center;
   gap: .35rem;
-  padding-left: .6rem;
 }
 .diff-pos { color: var(--live-green); font-weight: 600; }
 .diff-neg { color: var(--live-red);   font-weight: 600; }
