@@ -343,7 +343,10 @@ def _parse_schedule(html: str) -> dict:
         c0 = cells[0].strip()
         if date_re.match(c0):
             current_date = c0
-            continue
+            # The row may also contain game data (date in col 0, time in col 2,
+            # teams in col 3) — fall through instead of skipping it.
+            if len(cells) < 4:
+                continue
         if current_date is None or len(cells) < 4:
             continue
 
@@ -354,7 +357,8 @@ def _parse_schedule(html: str) -> dict:
 
         home_team = " ".join(parts[0].split())
         away_team = " ".join(parts[1].split())
-        time_str  = cells[0].strip()
+        # When cells[0] is a date, the time is in cells[2]; otherwise cells[0].
+        time_str  = cells[2].strip() if date_re.match(c0) else cells[0].strip()
         result_raw = cells[4].strip() if len(cells) > 4 else ""
         rm = result_re.search(result_raw)
         result    = f"{rm.group(1)}-{rm.group(2)}" if rm else None
