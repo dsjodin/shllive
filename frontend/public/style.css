@@ -374,8 +374,8 @@ tbody tr.zone-kval { border-left: none; }
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: .4rem .7rem;
-  min-width: 155px;
-  flex: 1 1 155px;
+  width: 165px;
+  flex: 0 0 165px;
   text-align: center;
 }
 .schedule-game-card.played {
