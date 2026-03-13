@@ -7,7 +7,8 @@ const POLL_MS     = 30_000;   // fallback polling interval
 let ws              = null;
 let pollTimer       = null;
 let lastPayload     = null;
-let lastChangedKey  = null;  // persists until next score change
+let lastChangedKey  = null;   // persists until next score change
+let lastChangedSide = null;   // 'home' | 'away' | null
 
 /* ── Entry ─────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
@@ -60,8 +61,9 @@ async function fetchAndRender() {
 function render(data) {
   // Detect which live game changed score since last render
   const prevGames  = lastPayload?.live_games ?? [];
-  const changedKey = detectScoreChange(prevGames, data.live_games ?? []);
-  if (changedKey) lastChangedKey = changedKey;
+  const changed = detectScoreChange(prevGames, data.live_games ?? []);
+  const changedKey = changed?.key ?? null;
+  if (changed) { lastChangedKey = changed.key; lastChangedSide = changed.side; }
 
   lastPayload = data;
 
@@ -79,26 +81,28 @@ function render(data) {
   document.getElementById('live-note').classList.toggle('hidden', !has_live);
 
   // Upcoming round (with live scores merged in)
-  renderSchedule(schedule, logos, live_games, changedKey, lastChangedKey);
+  renderSchedule(schedule, logos, live_games, changedKey, lastChangedKey, lastChangedSide);
 
   // Standings table
   renderStandings(standings, live_games, logos);
 }
 
-/* Returns "HOMECODE-AWAYCODE" for the game whose score changed, or null */
+/* Returns { key, side } for the game whose score changed, or null */
 function detectScoreChange(prev, curr) {
   const prevMap = {};
   for (const g of prev) prevMap[`${g.home_team_code}-${g.away_team_code}`] = g;
   for (const g of curr) {
-    const key  = `${g.home_team_code}-${g.away_team_code}`;
-    const old  = prevMap[key];
-    if (old && (old.home_score !== g.home_score || old.away_score !== g.away_score)) return key;
+    const key = `${g.home_team_code}-${g.away_team_code}`;
+    const old = prevMap[key];
+    if (!old) continue;
+    if (old.home_score !== g.home_score) return { key, side: 'home' };
+    if (old.away_score !== g.away_score) return { key, side: 'away' };
   }
   return null;
 }
 
 /* ── Upcoming round (with live scores merged in) ────────────────── */
-function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null, lastUpdatedKey = null) {
+function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null, lastUpdatedKey = null, lastUpdatedSide = null) {
   // Build lookup: "HOMECODE-AWAYCODE" → live game object
   const liveMap = {};
   for (const g of liveGames) {
@@ -141,14 +145,15 @@ function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null,
     const awayLogo = logos[g.away_code] ? `<img class="sched-logo" src="${esc(logos[g.away_code])}" alt="${esc(g.away_code)}" onerror="this.style.display='none'">` : '';
 
     const key         = `${g.home_code}-${g.away_code}`;
-    const scoreJustChanged = live && key === changedKey;
     const isLastUpdated    = live && key === lastUpdatedKey;
 
     let middleHtml;
     if (live) {
-      const scoreClass = scoreJustChanged ? ' score-flash' : '';
+      const blinkSide = isLastUpdated ? lastUpdatedSide : null;
+      const homeClass = blinkSide === 'home' ? ' class="score-digit score-blink"' : ' class="score-digit"';
+      const awayClass = blinkSide === 'away' ? ' class="score-digit score-blink"' : ' class="score-digit"';
       middleHtml = `
-        <span class="sched-live-score${scoreClass}">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-score"><span${homeClass}>${live.home_score}</span><span class="score-sep">–</span><span${awayClass}>${live.away_score}</span></span>
         <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
       `;
     } else if (g.played) {
@@ -159,7 +164,7 @@ function renderSchedule(schedule, logos = {}, liveGames = [], changedKey = null,
 
     const card = document.createElement('div');
     card.className = 'schedule-game-card'
-      + (live ? ' live' : g.played ? ' played' : '')
+      + (live     ? ' live'   : g.played ? ' played' : '')
       + (isLastUpdated ? ' last-updated' : '');
     card.innerHTML = `
       <div class="sched-teams">

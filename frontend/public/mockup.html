@@ -152,15 +152,16 @@ function renderSchedule(schedule, liveGames) {
   for (const g of games) {
     const live = liveMap[`${g.home_code}-${g.away_code}`] || null;
 
-    // In the mockup, simulate that DIF-SAIK scored most recently
-    const isLastUpdated    = live && g.home_code === 'DIF' && g.away_code === 'SAIK';
-    const scoreJustChanged = isLastUpdated;
+    // In the mockup, simulate that DIF-SAIK scored most recently (SAIK scored)
+    const isLastUpdated  = live && g.home_code === 'DIF' && g.away_code === 'SAIK';
+    const blinkSide      = isLastUpdated ? 'away' : null;
 
     let middleHtml;
     if (live) {
-      const scoreClass = scoreJustChanged ? ' score-flash' : '';
+      const homeClass = blinkSide === 'home' ? ' class="score-digit score-blink"' : ' class="score-digit"';
+      const awayClass = blinkSide === 'away' ? ' class="score-digit score-blink"' : ' class="score-digit"';
       middleHtml = `
-        <span class="sched-live-score${scoreClass}">${live.home_score}–${live.away_score}</span>
+        <span class="sched-live-score"><span${homeClass}>${live.home_score}</span><span class="score-sep">–</span><span${awayClass}>${live.away_score}</span></span>
         <span class="sched-live-status"><span class="sched-live-dot"></span>${esc(live.status)}</span>
       `;
     } else if (g.played) {
