@@ -90,7 +90,13 @@ async def _fetch_logos() -> dict:
     if _cache["logos"] is not None and now - _cache["logos_ts"] < LOGOS_TTL:
         return _cache["logos"]
     try:
-        data = await shl.get_team_logos()
+        standings = await _fetch_standings()
+        team_names: dict[str, str] = {
+            e["team"]["code"]: e["team"]["name"]
+            for e in standings
+            if isinstance(e.get("team"), dict) and e["team"].get("code")
+        }
+        data = await shl.get_team_logos(team_names)
         if data:  # only store if we got results
             _cache["logos"] = data
             _cache["logos_ts"] = now
