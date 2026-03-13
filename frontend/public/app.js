@@ -200,13 +200,6 @@ function renderStandings(standings, liveGames, logos = {}) {
     return;
   }
 
-  // Zone boundaries (after these ranks insert a separator)
-  // 1-6: Direktkval  |  7-10: Play-in  |  11-12: Ingenmansland  |  13-14: Kvalspel
-  const ZONE_SEPARATORS = {
-    6:  { label: 'Play-in',         cls: 'zone-sep-playin' },
-    10: { label: 'Ingenmansland',   cls: 'zone-sep-mid'    },
-    12: { label: 'Kvalspel',        cls: 'zone-sep-kval'   },
-  };
   const ZONE_CLASS = (rank) => {
     if (rank <= 6)  return 'zone-kval-direct';
     if (rank <= 10) return 'zone-playin';
@@ -216,15 +209,6 @@ function renderStandings(standings, liveGames, logos = {}) {
 
   standings.forEach((entry, idx) => {
     const rank = entry.rank ?? (idx + 1);
-
-    // Insert separator BEFORE this row if previous rank had a boundary
-    const sep = ZONE_SEPARATORS[rank - 1];
-    if (sep) {
-      const sepTr = document.createElement('tr');
-      sepTr.className = `zone-separator ${sep.cls}`;
-      sepTr.innerHTML = `<td colspan="11"><span class="zone-sep-label">${sep.label}</span></td>`;
-      tbody.appendChild(sepTr);
-    }
 
     const team       = entry.team || {};
     const code       = team.code || team.teamCode || entry.teamCode || '';

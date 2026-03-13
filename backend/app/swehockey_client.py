@@ -186,14 +186,15 @@ def _parse_standings(html: str) -> list[dict]:
         gf, ga = _parse_gf_ga(cells[6])
 
         try:
-            gp  = int(cells[2])
-            w   = int(cells[3])
-            t   = int(cells[4])
-            l   = int(cells[5])
-            gd  = int(cells[7])
-            pts = int(cells[8])
-            otw = int(cells[9])  if len(cells) > 9  else 0
-            otl = int(cells[10]) if len(cells) > 10 else 0
+            gp   = int(cells[2])
+            w    = int(cells[3])
+            l    = int(cells[5])
+            gd   = int(cells[7])
+            pts  = int(cells[8])
+            # OTW + GWSW = all OT/PS wins (2 pts each)
+            # OTL + GWSL = all OT/PS losses (1 pt each)
+            otw  = int(cells[9])  + int(cells[11]) if len(cells) > 11 else (int(cells[9])  if len(cells) > 9  else 0)
+            otl  = int(cells[10]) + int(cells[12]) if len(cells) > 12 else (int(cells[10]) if len(cells) > 10 else 0)
         except ValueError:
             continue
 
@@ -203,7 +204,6 @@ def _parse_standings(html: str) -> list[dict]:
                 "Points": pts,
                 "GP": gp,
                 "W": w,
-                "T": t,
                 "L": l,
                 "OTW": otw,
                 "OTL": otl,
