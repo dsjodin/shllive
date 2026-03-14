@@ -115,6 +115,7 @@ class SweHockeyClient:
         Returns:
             {team_code: badge_url}
         """
+        import asyncio as _asyncio
         logos: dict[str, str] = {}
         async with httpx.AsyncClient(
             timeout=15,
@@ -127,6 +128,8 @@ class SweHockeyClient:
                     logos[code] = url
                 else:
                     logger.warning("TSDB: no badge found for %s (%r)", code, name)
+                # Respect TSDB free-tier rate limit (~2 req/s)
+                await _asyncio.sleep(0.6)
         return logos
 
 
@@ -144,29 +147,40 @@ async def _tsdb_badge_url(client: httpx.AsyncClient, full_name: str) -> str | No
     Search TheSportsDB for a team by name and return its badge URL.
     Tries the full name first, then the first word only as a fallback.
     Filters results to Swedish teams to avoid false matches.
+    Retries once with backoff on HTTP 429.
     """
+    import asyncio as _asyncio
+
     for query in (_ascii_name(full_name), _ascii_name(full_name.split()[0])):
-        try:
-            resp = await client.get(
-                f"{TSDB_API}/searchteams.php",
-                params={"t": query},
-            )
-            resp.raise_for_status()
-            teams = (resp.json() or {}).get("teams") or []
-            # Prefer teams in Sweden / SHL; fall back to first result
-            ranked = sorted(
-                teams,
-                key=lambda t: (
-                    "sweden" not in (t.get("strCountry") or "").lower(),
-                    "shl" not in (t.get("strLeague") or "").lower(),
-                ),
-            )
-            for t in ranked:
-                badge = t.get("strTeamBadge") or t.get("strTeamBadge2") or ""
-                if badge:
-                    return badge
-        except Exception as exc:
-            logger.warning("TSDB search failed for %r: %s", query, exc)
+        for attempt in range(2):  # one retry on 429
+            try:
+                resp = await client.get(
+                    f"{TSDB_API}/searchteams.php",
+                    params={"t": query},
+                )
+                if resp.status_code == 429:
+                    wait = 2.0 * (attempt + 1)
+                    logger.warning("TSDB 429 for %r, retrying in %.1fs", query, wait)
+                    await _asyncio.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                teams = (resp.json() or {}).get("teams") or []
+                # Prefer teams in Sweden / SHL; fall back to first result
+                ranked = sorted(
+                    teams,
+                    key=lambda t: (
+                        "sweden" not in (t.get("strCountry") or "").lower(),
+                        "shl" not in (t.get("strLeague") or "").lower(),
+                    ),
+                )
+                for t in ranked:
+                    badge = t.get("strTeamBadge") or t.get("strTeamBadge2") or ""
+                    if badge:
+                        return badge
+                break  # got a valid (possibly empty) response – no retry needed
+            except Exception as exc:
+                logger.warning("TSDB search failed for %r: %s", query, exc)
+                break
     return None
 
 
