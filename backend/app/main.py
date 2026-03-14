@@ -1,11 +1,13 @@
 import asyncio
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .swehockey_client import SweHockeyClient
 from .standings import calculate_live_standings
@@ -35,6 +37,8 @@ STANDINGS_TTL = 300      # 5 minutes
 GAMES_TTL     = 30       # 30 seconds
 SCHEDULE_TTL  = 600      # 10 minutes
 LOGOS_TTL     = 86_400   # 24 hours
+
+LOGOS_DIR = os.getenv("LOGOS_DIR", "/app/static/logos")
 
 
 async def _fetch_standings() -> list[dict]:
@@ -86,6 +90,12 @@ async def _fetch_schedule() -> dict:
 
 
 async def _fetch_logos() -> dict:
+    """
+    Returns {team_code: "/static/logos/{file}"} for every team that has a
+    logo on disk.  On first call (or when teams are missing files) it
+    downloads the missing logos from TheSportsDB and saves them locally.
+    Subsequent calls just read the directory — no network needed.
+    """
     now = time.time()
     if _cache["logos"] is not None and now - _cache["logos_ts"] < LOGOS_TTL:
         return _cache["logos"]
@@ -96,8 +106,10 @@ async def _fetch_logos() -> dict:
             for e in standings
             if isinstance(e.get("team"), dict) and e["team"].get("code")
         }
-        data = await shl.get_team_logos(team_names)
-        if data:  # only store if we got results
+        local_files = await shl.download_team_logos(team_names, LOGOS_DIR)
+        # Convert filenames to URL paths served by StaticFiles
+        data = {code: f"/static/logos/{fname}" for code, fname in local_files.items()}
+        if data:
             _cache["logos"] = data
             _cache["logos_ts"] = now
         return _cache["logos"] or {}
@@ -142,6 +154,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="SHL Live Standings", lifespan=lifespan)
+
+os.makedirs(LOGOS_DIR, exist_ok=True)
+app.mount("/static/logos", StaticFiles(directory=LOGOS_DIR), name="logos")
 
 app.add_middleware(
     CORSMiddleware,

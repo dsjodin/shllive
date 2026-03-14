@@ -8,6 +8,8 @@ services:
       - SHL_CLIENT_ID=${SHL_CLIENT_ID}
       - SHL_CLIENT_SECRET=${SHL_CLIENT_SECRET}
       - SHL_SEASON=${SHL_SEASON:-2025}
+    volumes:
+      - logos_data:/app/static/logos
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 30s
@@ -32,3 +34,6 @@ services:
 networks:
   shl-net:
     driver: bridge
+
+volumes:
+  logos_data:

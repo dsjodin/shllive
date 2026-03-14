@@ -104,33 +104,66 @@ class SweHockeyClient:
         html = await self._get(f"/ScheduleAndResults/Schedule/{self.group_id}")
         return _parse_schedule(html)
 
-    async def get_team_logos(self, team_names: dict[str, str]) -> dict[str, str]:
+    async def download_team_logos(
+        self,
+        team_names: dict[str, str],
+        logos_dir: str,
+    ) -> dict[str, str]:
         """
-        Fetch team badge URLs from TheSportsDB search API.
+        Ensure each team has a logo file on disk inside *logos_dir*.
 
-        Args:
-            team_names: {team_code: full_team_name} — derived from live standings,
-                        so it always reflects the teams actually playing this season.
-
-        Returns:
-            {team_code: badge_url}
+        - Skips teams whose file already exists.
+        - Downloads missing logos from TheSportsDB and saves them.
+        - Returns {team_code: local_filename} for every team that has a file.
         """
         import asyncio as _asyncio
-        logos: dict[str, str] = {}
+        import os
+
+        os.makedirs(logos_dir, exist_ok=True)
+        local: dict[str, str] = {}
+
+        # Find which teams already have a file
+        existing = {
+            fname.split(".")[0]: fname
+            for fname in os.listdir(logos_dir)
+            if "." in fname
+        }
+        for code in team_names:
+            if code in existing:
+                local[code] = existing[code]
+
+        missing = {c: n for c, n in team_names.items() if c not in local}
+        if not missing:
+            return local
+
+        logger.info("Downloading logos for: %s", list(missing.keys()))
+
         async with httpx.AsyncClient(
-            timeout=15,
+            timeout=20,
             headers={"User-Agent": "Mozilla/5.0 (compatible; SHLLiveStandings/1.0)"},
             follow_redirects=True,
         ) as client:
-            for code, name in team_names.items():
-                url = await _tsdb_badge_url(client, name)
-                if url:
-                    logos[code] = url
+            for code, name in missing.items():
+                badge_url = await _tsdb_badge_url(client, name)
+                if badge_url:
+                    ext = badge_url.rsplit(".", 1)[-1].split("?")[0] or "png"
+                    filename = f"{code}.{ext}"
+                    filepath = os.path.join(logos_dir, filename)
+                    try:
+                        img_resp = await client.get(badge_url)
+                        img_resp.raise_for_status()
+                        with open(filepath, "wb") as fh:
+                            fh.write(img_resp.content)
+                        local[code] = filename
+                        logger.info("Logo saved: %s", filename)
+                    except Exception as exc:
+                        logger.warning("Failed to download logo for %s: %s", code, exc)
                 else:
                     logger.warning("TSDB: no badge found for %s (%r)", code, name)
-                # Respect TSDB free-tier rate limit (~2 req/s)
+                # Respect TSDB free-tier rate limit
                 await _asyncio.sleep(0.6)
-        return logos
+
+        return local
 
 
 # ------------------------------------------------------------------
