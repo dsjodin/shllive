@@ -111,7 +111,7 @@ class SweHockeyClient:
         Ensure each team has a logo file on disk inside *logos_dir*.
 
         - Skips teams whose file already exists.
-        - Fetches missing logo URLs from the SHL API, then downloads the images.
+        - Downloads missing logos from the SHL/Sportality CDN (no auth needed).
         - Returns {team_code: local_filename} for every team that has a file.
         """
         import os
@@ -119,7 +119,6 @@ class SweHockeyClient:
         os.makedirs(logos_dir, exist_ok=True)
         local: dict[str, str] = {}
 
-        # Find which teams already have a file
         existing = {
             fname.split(".")[0]: fname
             for fname in os.listdir(logos_dir)
@@ -135,20 +134,17 @@ class SweHockeyClient:
 
         logger.info("Downloading logos for: %s", list(missing.keys()))
 
-        logo_urls = await _shl_api_logos(self.season, set(missing.keys()))
-
         async with httpx.AsyncClient(
             timeout=20,
             headers={"User-Agent": "Mozilla/5.0 (compatible; SHLLiveStandings/1.0)"},
             follow_redirects=True,
         ) as client:
             for code in missing:
-                url = logo_urls.get(code)
+                url = _sportality_logo_url(code)
                 if not url:
-                    logger.warning("SHL API: no logo found for %s", code)
+                    logger.warning("No logo URL mapped for team code %s", code)
                     continue
-                ext = url.rsplit(".", 1)[-1].split("?")[0] or "png"
-                filename = f"{code}.{ext}"
+                filename = f"{code}.svg"
                 filepath = os.path.join(logos_dir, filename)
                 try:
                     resp = await client.get(url)
@@ -158,66 +154,42 @@ class SweHockeyClient:
                     local[code] = filename
                     logger.info("Logo saved: %s", filename)
                 except Exception as exc:
-                    logger.warning("Failed to download logo for %s: %s", code, exc)
+                    logger.warning("Failed to download logo for %s (%s): %s", code, url, exc)
 
         return local
 
 
 # ------------------------------------------------------------------
-# SHL API logo lookup
+# SHL / Sportality CDN logo lookup
 # ------------------------------------------------------------------
 
-SHL_API = "https://api.shl.se"
-_SHL_CLIENT_ID     = os.getenv("SHL_CLIENT_ID", "")
-_SHL_CLIENT_SECRET = os.getenv("SHL_CLIENT_SECRET", "")
+# Maps our internal team code → Sportality CDN slug.
+# CDN URL pattern: https://sportality.cdn.s8y.se/team-logos/{slug}1_{slug}.svg
+_SPORTALITY_SLUGS: dict[str, str] = {
+    "BRY":  "bif",   # Brynäs IF uses "bif" on the SHL CDN
+    "DIF":  "dif",
+    "FBK":  "fbk",
+    "FHC":  "fhc",
+    "HV71": "hv71",
+    "LHC":  "lhc",
+    "LHF":  "lhf",
+    "LIF":  "lif",
+    "MIF":  "mif",
+    "OHK":  "ohk",
+    "RBK":  "rbk",
+    "SAIK": "saik",
+    "TIK":  "tik",
+    "VLH":  "vlh",
+}
+
+_CDN_BASE = "https://sportality.cdn.s8y.se/team-logos"
 
 
-async def _shl_api_logos(season: str, team_codes: set[str]) -> dict[str, str]:
-    """
-    Fetch team logo URLs from the SHL API.
-
-    Returns {team_code: logo_url} for all teams found.
-    Falls back gracefully if credentials are absent or the call fails.
-    """
-    if not (_SHL_CLIENT_ID and _SHL_CLIENT_SECRET):
-        logger.warning("SHL API credentials not set – skipping logo fetch")
-        return {}
-
-    try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-            # 1. Obtain access token
-            token_resp = await client.post(
-                f"{SHL_API}/oauth2/token",
-                data={
-                    "grant_type":    "client_credentials",
-                    "client_id":     _SHL_CLIENT_ID,
-                    "client_secret": _SHL_CLIENT_SECRET,
-                },
-            )
-            token_resp.raise_for_status()
-            token = token_resp.json()["access_token"]
-
-            # 2. Fetch teams for the season
-            teams_resp = await client.get(
-                f"{SHL_API}/seasons/{season}/teams.json",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            teams_resp.raise_for_status()
-            teams: list[dict] = teams_resp.json()
-
-        logos: dict[str, str] = {}
-        for team in teams:
-            code = team.get("code", "")
-            logo = team.get("logo") or ""
-            if code in team_codes and logo:
-                logos[code] = logo
-
-        logger.info("SHL API: found logos for %s", list(logos.keys()))
-        return logos
-
-    except Exception as exc:
-        logger.warning("SHL API logo fetch failed: %s", exc)
-        return {}
+def _sportality_logo_url(code: str) -> str | None:
+    slug = _SPORTALITY_SLUGS.get(code)
+    if slug:
+        return f"{_CDN_BASE}/{slug}1_{slug}.svg"
+    return None
 
 
 # ------------------------------------------------------------------

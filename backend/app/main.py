@@ -109,10 +109,9 @@ async def _fetch_logos() -> dict:
         local_files = await shl.download_team_logos(team_names, LOGOS_DIR)
         # Convert filenames to URL paths served by StaticFiles
         data = {code: f"/static/logos/{fname}" for code, fname in local_files.items()}
-        if data:
-            _cache["logos"] = data
-            _cache["logos_ts"] = now
-        return _cache["logos"] or {}
+        _cache["logos"] = data
+        _cache["logos_ts"] = now
+        return data
     except Exception as exc:
         logger.error("Failed to fetch team logos: %s", exc)
         return _cache["logos"] or {}
