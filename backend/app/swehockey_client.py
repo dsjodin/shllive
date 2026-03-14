@@ -238,75 +238,78 @@ def _parse_live_games(html: str) -> list[dict]:
     """
     Parse the Live page for ongoing games.
 
-    The live page shows today's games with their current score.
-    Returns games in SHL-API-compatible format (liveGame block included).
+    Live scores are in div.TodaysGamesGame blocks (NOT tables):
+      - Score div (has class "p-1"): home team, score link, away team
+      - Status div (has class "pt-0"): period status text
     """
     soup = BeautifulSoup(html, "html.parser")
     games: list[dict] = []
 
-    # Look for game rows – the live page typically uses a table or
-    # repeated div blocks with home/away teams and scores.
-    table = None
-    for t in soup.find_all("table"):
-        headers = [th.get_text(strip=True).upper() for th in t.find_all("th")]
-        # Live table usually has no standard headers but contains score-like cells
-        rows = t.find_all("tr")
-        if len(rows) > 1:
-            table = t
-            break
+    score_re = re.compile(r"(\d+)\s*-\s*(\d+)")
 
-    if table is None:
-        return []
+    game_divs = soup.find_all("div", class_="TodaysGamesGame")
 
-    score_re = re.compile(r"(\d+)\s*[-–]\s*(\d+)")
-    period_re = re.compile(r"\b([1-4])\b")
+    i = 0
+    while i < len(game_divs):
+        div = game_divs[i]
+        classes = div.get("class", [])
 
-    for tr in table.find_all("tr")[1:]:
-        cells = [td.get_text(separator=" ", strip=True) for td in tr.find_all("td")]
-        if len(cells) < 3:
+        # Score divs have "p-1"; status divs have "pt-0" – skip status divs here
+        if "p-1" not in classes:
+            i += 1
             continue
 
-        # Try to find a score in any cell
-        score_cell = None
-        score_match = None
-        for cell in cells:
-            m = score_re.search(cell)
-            if m:
-                score_cell = cell
-                score_match = m
-                break
+        # Home team is in col-5 text-right, away in col-5 text-left
+        home_div = div.find("div", class_=lambda c: c and "text-right" in c)
+        away_div = div.find("div", class_=lambda c: c and "text-left" in c)
+        result_div = div.find("div", class_=lambda c: c and "Result" in c)
 
+        if not (home_div and away_div and result_div):
+            i += 1
+            continue
+
+        home_name = home_div.get_text(strip=True)
+        away_name = away_div.get_text(strip=True)
+
+        # Score is in the <a> inside Result div (e.g. "2 - 1")
+        score_link = result_div.find("a")
+        score_text = score_link.get_text(strip=True) if score_link else ""
+        score_match = score_re.search(score_text)
         if not score_match:
+            i += 1
             continue
 
         home_score = int(score_match.group(1))
         away_score = int(score_match.group(2))
 
-        # Derive team names: assume cell[0] = home, cell[-1] or nearby = away
-        # The game column typically reads "HomeTeam - AwayTeam" or similar
-        game_text = cells[0] if cells else ""
-        teams = re.split(r"\s+-\s+", game_text, maxsplit=1)
-        home_name = teams[0].strip() if len(teams) >= 1 else "?"
-        away_name = teams[1].strip() if len(teams) >= 2 else "?"
+        # Status text is in the immediately following TodaysGamesGame div (pt-0)
+        status_text = ""
+        if i + 1 < len(game_divs):
+            next_div = game_divs[i + 1]
+            if "pt-0" in next_div.get("class", []):
+                status_text = next_div.get_text(strip=True)
 
-        # Try to find period info
-        period = 0
-        status_text = score_cell or ""
-        pm = period_re.search(status_text)
-        if pm:
-            period = int(pm.group(1))
-        elif "OT" in status_text.upper():
+        # Determine period from status
+        status_lower = status_text.lower()
+        if "3rd period" in status_lower or "p3" in status_lower:
+            period = 3
+        elif "2nd period" in status_lower or "p2" in status_lower:
+            period = 2
+        elif "ot" in status_lower or "overtime" in status_lower:
             period = 4
+        else:
+            period = 1  # 1st period or unknown
 
-        # Only include if the game appears to be ongoing (period > 0)
-        if period == 0:
-            period = 1  # assume at least started
+        # Mark as played (finished) only if status indicates final
+        is_finished = any(
+            word in status_lower for word in ("final", "slut", "game over")
+        )
 
         games.append(
             {
                 "homeTeam": {"code": _team_code(home_name), "name": home_name},
                 "awayTeam": {"code": _team_code(away_name), "name": away_name},
-                "played": False,
+                "played": is_finished,
                 "liveGame": {
                     "homeTeamScore": home_score,
                     "awayTeamScore": away_score,
@@ -315,6 +318,8 @@ def _parse_live_games(html: str) -> list[dict]:
                 },
             }
         )
+
+        i += 1
 
     return games
 
