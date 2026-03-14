@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 import os
 import re
-import unicodedata
 from datetime import date
 from typing import Optional
 
@@ -21,7 +20,6 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://stats.swehockey.se"
-TSDB_API  = "https://www.thesportsdb.com/api/v1/json/3"
 
 # Default group ID for SHL 2025-26 (updated each season via env var)
 DEFAULT_GROUP_ID = os.getenv("SWE_GROUP_ID", "18263")
@@ -113,10 +111,9 @@ class SweHockeyClient:
         Ensure each team has a logo file on disk inside *logos_dir*.
 
         - Skips teams whose file already exists.
-        - Downloads missing logos from TheSportsDB and saves them.
+        - Fetches missing logo URLs from the SHL API, then downloads the images.
         - Returns {team_code: local_filename} for every team that has a file.
         """
-        import asyncio as _asyncio
         import os
 
         os.makedirs(logos_dir, exist_ok=True)
@@ -138,83 +135,89 @@ class SweHockeyClient:
 
         logger.info("Downloading logos for: %s", list(missing.keys()))
 
+        logo_urls = await _shl_api_logos(self.season, set(missing.keys()))
+
         async with httpx.AsyncClient(
             timeout=20,
             headers={"User-Agent": "Mozilla/5.0 (compatible; SHLLiveStandings/1.0)"},
             follow_redirects=True,
         ) as client:
-            for code, name in missing.items():
-                badge_url = await _tsdb_badge_url(client, name)
-                if badge_url:
-                    ext = badge_url.rsplit(".", 1)[-1].split("?")[0] or "png"
-                    filename = f"{code}.{ext}"
-                    filepath = os.path.join(logos_dir, filename)
-                    try:
-                        img_resp = await client.get(badge_url)
-                        img_resp.raise_for_status()
-                        with open(filepath, "wb") as fh:
-                            fh.write(img_resp.content)
-                        local[code] = filename
-                        logger.info("Logo saved: %s", filename)
-                    except Exception as exc:
-                        logger.warning("Failed to download logo for %s: %s", code, exc)
-                else:
-                    logger.warning("TSDB: no badge found for %s (%r)", code, name)
-                # Respect TSDB free-tier rate limit
-                await _asyncio.sleep(0.6)
+            for code in missing:
+                url = logo_urls.get(code)
+                if not url:
+                    logger.warning("SHL API: no logo found for %s", code)
+                    continue
+                ext = url.rsplit(".", 1)[-1].split("?")[0] or "png"
+                filename = f"{code}.{ext}"
+                filepath = os.path.join(logos_dir, filename)
+                try:
+                    resp = await client.get(url)
+                    resp.raise_for_status()
+                    with open(filepath, "wb") as fh:
+                        fh.write(resp.content)
+                    local[code] = filename
+                    logger.info("Logo saved: %s", filename)
+                except Exception as exc:
+                    logger.warning("Failed to download logo for %s: %s", code, exc)
 
         return local
 
 
 # ------------------------------------------------------------------
-# TheSportsDB logo lookup
+# SHL API logo lookup
 # ------------------------------------------------------------------
 
-def _ascii_name(s: str) -> str:
-    """Strip diacritics so Swedish names work in TSDB search."""
-    return unicodedata.normalize("NFD", s).encode("ascii", "ignore").decode()
+SHL_API = "https://api.shl.se"
+_SHL_CLIENT_ID     = os.getenv("SHL_CLIENT_ID", "")
+_SHL_CLIENT_SECRET = os.getenv("SHL_CLIENT_SECRET", "")
 
 
-async def _tsdb_badge_url(client: httpx.AsyncClient, full_name: str) -> str | None:
+async def _shl_api_logos(season: str, team_codes: set[str]) -> dict[str, str]:
     """
-    Search TheSportsDB for a team by name and return its badge URL.
-    Tries the full name first, then the first word only as a fallback.
-    Filters results to Swedish teams to avoid false matches.
-    Retries once with backoff on HTTP 429.
-    """
-    import asyncio as _asyncio
+    Fetch team logo URLs from the SHL API.
 
-    for query in (_ascii_name(full_name), _ascii_name(full_name.split()[0])):
-        for attempt in range(2):  # one retry on 429
-            try:
-                resp = await client.get(
-                    f"{TSDB_API}/searchteams.php",
-                    params={"t": query},
-                )
-                if resp.status_code == 429:
-                    wait = 2.0 * (attempt + 1)
-                    logger.warning("TSDB 429 for %r, retrying in %.1fs", query, wait)
-                    await _asyncio.sleep(wait)
-                    continue
-                resp.raise_for_status()
-                teams = (resp.json() or {}).get("teams") or []
-                # Prefer teams in Sweden / SHL; fall back to first result
-                ranked = sorted(
-                    teams,
-                    key=lambda t: (
-                        "sweden" not in (t.get("strCountry") or "").lower(),
-                        "shl" not in (t.get("strLeague") or "").lower(),
-                    ),
-                )
-                for t in ranked:
-                    badge = t.get("strTeamBadge") or t.get("strTeamBadge2") or ""
-                    if badge:
-                        return badge
-                break  # got a valid (possibly empty) response – no retry needed
-            except Exception as exc:
-                logger.warning("TSDB search failed for %r: %s", query, exc)
-                break
-    return None
+    Returns {team_code: logo_url} for all teams found.
+    Falls back gracefully if credentials are absent or the call fails.
+    """
+    if not (_SHL_CLIENT_ID and _SHL_CLIENT_SECRET):
+        logger.warning("SHL API credentials not set – skipping logo fetch")
+        return {}
+
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            # 1. Obtain access token
+            token_resp = await client.post(
+                f"{SHL_API}/oauth2/token",
+                data={
+                    "grant_type":    "client_credentials",
+                    "client_id":     _SHL_CLIENT_ID,
+                    "client_secret": _SHL_CLIENT_SECRET,
+                },
+            )
+            token_resp.raise_for_status()
+            token = token_resp.json()["access_token"]
+
+            # 2. Fetch teams for the season
+            teams_resp = await client.get(
+                f"{SHL_API}/seasons/{season}/teams.json",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            teams_resp.raise_for_status()
+            teams: list[dict] = teams_resp.json()
+
+        logos: dict[str, str] = {}
+        for team in teams:
+            code = team.get("code", "")
+            logo = team.get("logo") or ""
+            if code in team_codes and logo:
+                logos[code] = logo
+
+        logger.info("SHL API: found logos for %s", list(logos.keys()))
+        return logos
+
+    except Exception as exc:
+        logger.warning("SHL API logo fetch failed: %s", exc)
+        return {}
 
 
 # ------------------------------------------------------------------
